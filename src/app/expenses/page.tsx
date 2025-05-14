@@ -34,6 +34,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { APP_LOGGED_IN_USER_KEY, getUserSpecificKey } from "@/lib/storageKeys";
+import { useRouter } from "next/navigation";
 
 interface Expense {
   id: string;
@@ -43,7 +45,6 @@ interface Expense {
   amount: number;
 }
 
-// Interface for category data used in localStorage (icon as string name)
 interface StoredCategory {
   id: string;
   name: string;
@@ -51,7 +52,6 @@ interface StoredCategory {
   color?: string;
 }
 
-// Interface for category data used in component state (icon as LucideIcon component)
 interface Category {
   id: string;
   name: string;
@@ -59,8 +59,8 @@ interface Category {
   color?: string;
 }
 
-const APP_EXPENSES_STORAGE_KEY = "remindme_expenses";
-const APP_CATEGORIES_STORAGE_KEY = "remindme_categories";
+const APP_EXPENSES_STORAGE_KEY_BASE = "remindme_expenses";
+const APP_CATEGORIES_STORAGE_KEY_BASE = "remindme_categories"; // For reading categories
 
 const availableIcons: { name: string; component: LucideIcon }[] = [
     { name: "Utensils", component: Utensils },
@@ -76,70 +76,102 @@ const mapStoredToCategory = (storedCat: StoredCategory): Category => ({
   icon: availableIcons.find(i => i.name === storedCat.iconName)?.component || Shapes,
 });
 
-// Default categories if nothing in localStorage (should match initialCategoriesData in categories/page.tsx)
-const defaultPageCategoriesData: StoredCategory[] = [
-  { id: "1", name: "Food & Dining", iconName: "Utensils", color: "hsl(30, 80%, 60%)" },
-  { id: "2", name: "Transportation", iconName: "Car", color: "hsl(200, 70%, 60%)" },
-  { id: "3", name: "Shopping", iconName: "Shirt", color: "hsl(300, 60%, 60%)" },
-  { id: "4", name: "Housing", iconName: "Home", color: "hsl(120, 50%, 50%)" },
-  { id: "5", name: "Gifts", iconName: "Gift", color: "hsl(0, 70%, 65%)" },
-];
-
-
 export default function ExpensesPage() {
-  const [expenses, setExpenses] = React.useState<Expense[]>(() => {
-    if (typeof window !== 'undefined') {
-      const storedExpenses = localStorage.getItem(APP_EXPENSES_STORAGE_KEY);
-      if (storedExpenses) {
-        try {
-          return JSON.parse(storedExpenses);
-        } catch (e) {
-          console.error("Failed to parse expenses from localStorage", e);
-        }
-      }
-    }
-    return []; // Initialize with an empty array
-  });
-  const [pageCategories, setPageCategories] = React.useState<Category[]>(() => defaultPageCategoriesData.map(mapStoredToCategory));
+  const router = useRouter();
+  const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
+  const [expenses, setExpenses] = React.useState<Expense[]>([]);
+  const [pageCategories, setPageCategories] = React.useState<Category[]>([]);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingExpense, setEditingExpense] = React.useState<Expense | null>(null);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(APP_EXPENSES_STORAGE_KEY, JSON.stringify(expenses));
-      window.dispatchEvent(new CustomEvent('localStorageUpdated', { detail: { key: APP_EXPENSES_STORAGE_KEY } }));
+      const loggedInUserRaw = localStorage.getItem(APP_LOGGED_IN_USER_KEY);
+      if (loggedInUserRaw) {
+        try {
+          const loggedInUser = JSON.parse(loggedInUserRaw);
+          setCurrentUserEmail(loggedInUser.email);
+        } catch (e) {
+          console.error("Failed to parse logged in user", e);
+          router.push('/login');
+        }
+      } else {
+        router.push('/login');
+      }
     }
-  }, [expenses]);
+  }, [router]);
 
+  // Load expenses for the current user
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && currentUserEmail) {
+      const userExpensesKey = getUserSpecificKey(APP_EXPENSES_STORAGE_KEY_BASE, currentUserEmail);
+      const storedExpenses = localStorage.getItem(userExpensesKey);
+      if (storedExpenses) {
+        try {
+          setExpenses(JSON.parse(storedExpenses));
+        } catch (e) {
+          console.error("Failed to parse expenses from localStorage", e);
+          setExpenses([]); // Fallback to empty
+        }
+      } else {
+        setExpenses([]); // No expenses for this user yet
+      }
+    } else if (typeof window !== 'undefined' && !currentUserEmail) {
+        setExpenses([]);
+    }
+  }, [currentUserEmail]);
+
+  // Save expenses for the current user
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && currentUserEmail) {
+      const userExpensesKey = getUserSpecificKey(APP_EXPENSES_STORAGE_KEY_BASE, currentUserEmail);
+      localStorage.setItem(userExpensesKey, JSON.stringify(expenses));
+      window.dispatchEvent(new CustomEvent('localStorageUpdated', { detail: { key: userExpensesKey } }));
+    }
+  }, [expenses, currentUserEmail]);
+
+  // Load categories for the current user
   React.useEffect(() => {
     const loadCategories = () => {
-      if (typeof window === 'undefined') return;
-      const storedCategoriesRaw = localStorage.getItem(APP_CATEGORIES_STORAGE_KEY);
+      if (typeof window === 'undefined' || !currentUserEmail) {
+        setPageCategories([]);
+        return;
+      }
+      const userCategoriesKey = getUserSpecificKey(APP_CATEGORIES_STORAGE_KEY_BASE, currentUserEmail);
+      const storedCategoriesRaw = localStorage.getItem(userCategoriesKey);
       if (storedCategoriesRaw) {
         try {
           const storedCategories: StoredCategory[] = JSON.parse(storedCategoriesRaw);
           setPageCategories(storedCategories.map(mapStoredToCategory));
         } catch (e) {
           console.error("Failed to parse categories from localStorage for expenses page", e);
-          setPageCategories(defaultPageCategoriesData.map(mapStoredToCategory));
+          setPageCategories([]); // Fallback to empty
         }
       } else {
-         setPageCategories(defaultPageCategoriesData.map(mapStoredToCategory));
+         setPageCategories([]); // No categories defined for this user yet
       }
     };
 
-    loadCategories(); // Load on mount
+    loadCategories();
 
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === APP_CATEGORIES_STORAGE_KEY || event.key === APP_EXPENSES_STORAGE_KEY) {
-        loadCategories();
+      if (currentUserEmail) {
+        const userCatKey = getUserSpecificKey(APP_CATEGORIES_STORAGE_KEY_BASE, currentUserEmail);
+        // const userExpKey = getUserSpecificKey(APP_EXPENSES_STORAGE_KEY_BASE, currentUserEmail);
+        if (event.key === userCatKey /*|| event.key === userExpKey */) { // We only need to reload categories if they change
+          loadCategories();
+        }
       }
     };
     
     const handleLocalStorageUpdated = (event: CustomEvent) => {
-        if (event.detail?.key === APP_CATEGORIES_STORAGE_KEY || event.detail?.key === APP_EXPENSES_STORAGE_KEY) {
+      if (currentUserEmail) {
+        const userCatKey = getUserSpecificKey(APP_CATEGORIES_STORAGE_KEY_BASE, currentUserEmail);
+        // const userExpKey = getUserSpecificKey(APP_EXPENSES_STORAGE_KEY_BASE, currentUserEmail);
+        if (event.detail?.key === userCatKey /*|| event.detail?.key === userExpKey */) {
             loadCategories();
         }
+      }
     };
 
     window.addEventListener('storage', handleStorageChange); 
@@ -149,7 +181,7 @@ export default function ExpensesPage() {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('localStorageUpdated', handleLocalStorageUpdated as EventListener);
     };
-  }, []);
+  }, [currentUserEmail]);
 
 
   const handleOpenDialog = (expense?: Expense) => {
@@ -185,6 +217,15 @@ export default function ExpensesPage() {
     return pageCategories.find(cat => cat.name === categoryName);
   };
 
+  if (!currentUserEmail) {
+    return (
+      <AppLayout>
+        <div className="flex h-full items-center justify-center">
+          <p>Cargando datos del usuario...</p>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -221,7 +262,7 @@ export default function ExpensesPage() {
                 const IconCmp = categoryDetails?.icon || Shapes; 
                 return (
                   <TableRow key={exp.id}>
-                    <TableCell>{new Date(exp.date).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(exp.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</TableCell>
                     <TableCell>
                       <Badge 
                         variant="outline" 
@@ -287,11 +328,12 @@ export default function ExpensesPage() {
                 disabled={pageCategories.length === 0}
                 className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {pageCategories.length === 0 && <option disabled value="">No hay categorías disponibles. Agregue una categoría primero.</option>}
+                {pageCategories.length === 0 && <option disabled value="">No hay categorías. Agregue una en la sección 'Categorías'.</option>}
                 {pageCategories.map(cat => (
                   <option key={cat.id} value={cat.name}>{cat.name}</option>
                 ))}
               </select>
+               {pageCategories.length === 0 && <p className="mt-1 text-xs text-muted-foreground">Por favor, primero crea categorías en la sección 'Categorías'.</p>}
             </div>
             <div>
               <Label htmlFor="description" className="mb-1 block">Descripción</Label>
@@ -307,4 +349,3 @@ export default function ExpensesPage() {
     </AppLayout>
   );
 }
-

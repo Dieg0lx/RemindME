@@ -6,7 +6,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Edit, PlusCircle, Shapes, Trash2, Utensils, Car, Shirt, Home, Gift } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { APP_LOGGED_IN_USER_KEY, getUserSpecificKey } from "@/lib/storageKeys";
+import { useRouter } from "next/navigation";
 
 // Interface for category data used in localStorage (icon as string name)
 interface StoredCategory {
@@ -36,14 +38,12 @@ interface Category {
   color?: string;
 }
 
-const APP_CATEGORIES_STORAGE_KEY = "remindme_categories";
+const APP_CATEGORIES_STORAGE_KEY_BASE = "remindme_categories";
 
 const initialCategoriesData: Omit<Category, 'icon'> & { iconName: string }[] = [
   { id: "1", name: "Comida y Cena", iconName: "Utensils", color: "hsl(30, 80%, 60%)" },
   { id: "2", name: "Transporte", iconName: "Car", color: "hsl(200, 70%, 60%)" },
-  { id: "3", name: "Compras", iconName: "Shirt", color: "hsl(300, 60%, 60%)" },
-  { id: "4", name: "Vivienda", iconName: "Home", color: "hsl(120, 50%, 50%)" },
-  { id: "5", name: "Regalos", iconName: "Gift", color: "hsl(0, 70%, 65%)" },
+  { id: "3", name: "Vivienda", iconName: "Home", color: "hsl(120, 50%, 50%)" },
 ];
 
 const availableIcons: { name: string; component: LucideIcon }[] = [
@@ -66,35 +66,64 @@ const mapCategoryToStored = (cat: Category): StoredCategory => ({
 });
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = React.useState<Category[]>(() => {
-    if (typeof window !== 'undefined') {
-      const storedCategoriesRaw = localStorage.getItem(APP_CATEGORIES_STORAGE_KEY);
-      if (storedCategoriesRaw) {
-        try {
-          const storedCategories: StoredCategory[] = JSON.parse(storedCategoriesRaw);
-          return storedCategories.map(mapStoredToCategory);
-        } catch (e) {
-          console.error("Failed to parse categories from localStorage", e);
-        }
-      }
-    }
-    return initialCategoriesData.map(data => ({
-      ...data,
-      icon: availableIcons.find(i => i.name === data.iconName)?.component || Shapes,
-    }));
-  });
-
+  const router = useRouter();
+  const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
+  const [categories, setCategories] = React.useState<Category[]>([]);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingCategory, setEditingCategory] = React.useState<Category | null>(null);
 
   React.useEffect(() => {
-    // Save to localStorage whenever categories change
     if (typeof window !== 'undefined') {
-      const storedCategories = categories.map(mapCategoryToStored);
-      localStorage.setItem(APP_CATEGORIES_STORAGE_KEY, JSON.stringify(storedCategories));
-      window.dispatchEvent(new CustomEvent('localStorageUpdated', { detail: { key: APP_CATEGORIES_STORAGE_KEY } }));
+      const loggedInUserRaw = localStorage.getItem(APP_LOGGED_IN_USER_KEY);
+      if (loggedInUserRaw) {
+        try {
+          const loggedInUser = JSON.parse(loggedInUserRaw);
+          setCurrentUserEmail(loggedInUser.email);
+        } catch (e) {
+          console.error("Failed to parse logged in user", e);
+          router.push('/login');
+        }
+      } else {
+        router.push('/login');
+      }
     }
-  }, [categories]);
+  }, [router]);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && currentUserEmail) {
+      const userCategoriesKey = getUserSpecificKey(APP_CATEGORIES_STORAGE_KEY_BASE, currentUserEmail);
+      const storedCategoriesRaw = localStorage.getItem(userCategoriesKey);
+      if (storedCategoriesRaw) {
+        try {
+          const storedCategories: StoredCategory[] = JSON.parse(storedCategoriesRaw);
+          setCategories(storedCategories.map(mapStoredToCategory));
+        } catch (e) {
+          console.error("Failed to parse categories from localStorage", e);
+          setCategories(initialCategoriesData.map(data => ({
+            ...data,
+            icon: availableIcons.find(i => i.name === data.iconName)?.component || Shapes,
+          })));
+        }
+      } else {
+        setCategories(initialCategoriesData.map(data => ({
+          ...data,
+          icon: availableIcons.find(i => i.name === data.iconName)?.component || Shapes,
+        })));
+      }
+    } else if (typeof window !== 'undefined' && !currentUserEmail) {
+        setCategories([]); // Clear if no user
+    }
+  }, [currentUserEmail]);
+
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && currentUserEmail) {
+      const userCategoriesKey = getUserSpecificKey(APP_CATEGORIES_STORAGE_KEY_BASE, currentUserEmail);
+      const storedCategories = categories.map(mapCategoryToStored);
+      localStorage.setItem(userCategoriesKey, JSON.stringify(storedCategories));
+      window.dispatchEvent(new CustomEvent('localStorageUpdated', { detail: { key: userCategoriesKey } }));
+    }
+  }, [categories, currentUserEmail]);
 
 
   const handleOpenDialog = (category?: Category) => {
@@ -128,6 +157,16 @@ export default function CategoriesPage() {
     setCategories(cats => cats.filter(c => c.id !== id));
   };
 
+  if (!currentUserEmail) {
+    return (
+      <AppLayout>
+        <div className="flex h-full items-center justify-center">
+          <p>Cargando datos del usuario...</p>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <PageHeader
@@ -137,7 +176,7 @@ export default function CategoriesPage() {
         onActionButtonClick={() => handleOpenDialog()}
       />
 
-      {categories.length === 0 ? (
+      {categories.length === 0 && currentUserEmail ? ( // Show empty state if user is loaded but has no categories
         <EmptyState
           IconCmp={Shapes}
           title="No Hay Categorías Definidas"
@@ -215,4 +254,3 @@ export default function CategoriesPage() {
     </AppLayout>
   );
 }
-

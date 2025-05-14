@@ -42,6 +42,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { APP_LOGGED_IN_USER_KEY, getUserSpecificKey } from "@/lib/storageKeys";
+import { useRouter } from "next/navigation";
 
 interface Subscription {
   id: string;
@@ -52,45 +54,69 @@ interface Subscription {
   status: "Activa" | "Pausada" | "Cancelada";
 }
 
-const APP_SUBSCRIPTIONS_STORAGE_KEY = "remindme_subscriptions";
+const APP_SUBSCRIPTIONS_STORAGE_KEY_BASE = "remindme_subscriptions";
 
-
-const initialSubscriptions: Subscription[] = [
+const initialSubscriptionsData: Subscription[] = [
   { id: "1", name: "Netflix Premium", amount: 19.99, cycle: "Mensual", nextDueDate: "2024-08-15", status: "Activa" },
   { id: "2", name: "Spotify Family", amount: 16.99, cycle: "Mensual", nextDueDate: "2024-08-20", status: "Activa" },
   { id: "3", name: "Adobe Creative Cloud", amount: 599.88, cycle: "Anual", nextDueDate: "2025-01-10", status: "Activa" },
-  { id: "4", name: "Membresía de Gimnasio", amount: 45.00, cycle: "Mensual", nextDueDate: "2024-08-01", status: "Pausada" },
-  { id: "5", name: "Servicio Antiguo", amount: 10.00, cycle: "Mensual", nextDueDate: "2024-07-01", status: "Cancelada" },
 ];
 
 const subscriptionCycles: Subscription["cycle"][] = ["Mensual", "Anual", "Trimestral"];
 const subscriptionStatuses: Subscription["status"][] = ["Activa", "Pausada", "Cancelada"];
 
 export default function SubscriptionsPage() {
-  const [subscriptions, setSubscriptions] = React.useState<Subscription[]>(() => {
-    if (typeof window !== 'undefined') {
-      const storedSubscriptions = localStorage.getItem(APP_SUBSCRIPTIONS_STORAGE_KEY);
-      if (storedSubscriptions) {
-        try {
-          return JSON.parse(storedSubscriptions);
-        } catch (e) {
-          console.error("Failed to parse subscriptions from localStorage", e);
-        }
-      }
-      return initialSubscriptions; // Initialize with default if nothing in storage
-    }
-    return initialSubscriptions; // Default for SSR or if window is undefined
-  });
-
+  const router = useRouter();
+  const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
+  const [subscriptions, setSubscriptions] = React.useState<Subscription[]>([]);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingSubscription, setEditingSubscription] = React.useState<Subscription | null>(null);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(APP_SUBSCRIPTIONS_STORAGE_KEY, JSON.stringify(subscriptions));
-       window.dispatchEvent(new CustomEvent('localStorageUpdated', { detail: { key: APP_SUBSCRIPTIONS_STORAGE_KEY } }));
+      const loggedInUserRaw = localStorage.getItem(APP_LOGGED_IN_USER_KEY);
+      if (loggedInUserRaw) {
+        try {
+          const loggedInUser = JSON.parse(loggedInUserRaw);
+          setCurrentUserEmail(loggedInUser.email);
+        } catch (e) {
+          console.error("Failed to parse logged in user", e);
+          router.push('/login');
+        }
+      } else {
+        router.push('/login');
+      }
     }
-  }, [subscriptions]);
+  }, [router]);
+
+  // Load subscriptions for the current user
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && currentUserEmail) {
+      const userSubscriptionsKey = getUserSpecificKey(APP_SUBSCRIPTIONS_STORAGE_KEY_BASE, currentUserEmail);
+      const storedSubscriptions = localStorage.getItem(userSubscriptionsKey);
+      if (storedSubscriptions) {
+        try {
+          setSubscriptions(JSON.parse(storedSubscriptions));
+        } catch (e) {
+          console.error("Failed to parse subscriptions from localStorage", e);
+          setSubscriptions(initialSubscriptionsData); // Fallback to initial
+        }
+      } else {
+        setSubscriptions(initialSubscriptionsData); // Seed initial for new user
+      }
+    } else if (typeof window !== 'undefined' && !currentUserEmail) {
+        setSubscriptions([]);
+    }
+  }, [currentUserEmail]);
+
+  // Save subscriptions for the current user
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && currentUserEmail) {
+      const userSubscriptionsKey = getUserSpecificKey(APP_SUBSCRIPTIONS_STORAGE_KEY_BASE, currentUserEmail);
+      localStorage.setItem(userSubscriptionsKey, JSON.stringify(subscriptions));
+      window.dispatchEvent(new CustomEvent('localStorageUpdated', { detail: { key: userSubscriptionsKey } }));
+    }
+  }, [subscriptions, currentUserEmail]);
 
 
   const handleOpenDialog = (subscription?: Subscription) => {
@@ -129,6 +155,16 @@ export default function SubscriptionsPage() {
     );
   };
 
+  if (!currentUserEmail) {
+    return (
+      <AppLayout>
+        <div className="flex h-full items-center justify-center">
+          <p>Cargando datos del usuario...</p>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <PageHeader
@@ -138,7 +174,7 @@ export default function SubscriptionsPage() {
         onActionButtonClick={() => handleOpenDialog()}
       />
 
-      {subscriptions.length === 0 ? (
+      {subscriptions.length === 0 && currentUserEmail ? (
         <EmptyState
           IconCmp={CreditCard}
           title="Aún No Hay Suscripciones"
@@ -165,7 +201,7 @@ export default function SubscriptionsPage() {
                   <TableCell className="font-medium">{sub.name}</TableCell>
                   <TableCell className="text-right">${sub.amount.toFixed(2)}</TableCell>
                   <TableCell>{sub.cycle}</TableCell>
-                  <TableCell>{sub.nextDueDate}</TableCell>
+                  <TableCell>{new Date(sub.nextDueDate).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</TableCell>
                   <TableCell>
                     <Badge 
                       variant={sub.status === "Activa" ? "default" : sub.status === "Pausada" ? "secondary" : "destructive"} 
@@ -275,4 +311,3 @@ export default function SubscriptionsPage() {
     </AppLayout>
   );
 }
-

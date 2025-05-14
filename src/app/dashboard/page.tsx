@@ -10,10 +10,12 @@ import { DollarSign, TrendingUp, TrendingDown, Wallet } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip as ChartTooltipRecharts, Legend } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale'; // Import Spanish locale
+import { es } from 'date-fns/locale'; 
+import { APP_LOGGED_IN_USER_KEY, getUserSpecificKey } from "@/lib/storageKeys";
+import { useRouter } from "next/navigation";
 
-const APP_EXPENSES_STORAGE_KEY = "remindme_expenses";
-const APP_INCOME_STORAGE_KEY = "remindme_income_transactions";
+const APP_EXPENSES_STORAGE_KEY_BASE = "remindme_expenses";
+const APP_INCOME_STORAGE_KEY_BASE = "remindme_income_transactions";
 
 interface Expense {
   id: string;
@@ -31,7 +33,7 @@ interface IncomeTransaction {
 }
 
 interface MonthlySummary {
-  month: string; // e.g., "Julio"
+  month: string; 
   year: number;
   expenses: number;
   income: number;
@@ -49,17 +51,40 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
+
   const [totalBalance, setTotalBalance] = React.useState<number>(0);
   const [monthlyIncome, setMonthlyIncome] = React.useState<number>(0);
   const [monthlyExpenses, setMonthlyExpenses] = React.useState<number>(0);
   const [budgetUtilization, setBudgetUtilization] = React.useState<number>(0);
   const [monthlyChartData, setMonthlyChartData] = React.useState<MonthlySummary[]>([]);
 
-  const fetchDataAndUpdateDashboard = React.useCallback(() => {
-    if (typeof window === 'undefined') return;
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const loggedInUserRaw = localStorage.getItem(APP_LOGGED_IN_USER_KEY);
+      if (loggedInUserRaw) {
+        try {
+          const loggedInUser = JSON.parse(loggedInUserRaw);
+          setCurrentUserEmail(loggedInUser.email);
+        } catch (e) {
+          console.error("Failed to parse logged in user", e);
+          router.push('/login');
+        }
+      } else {
+        router.push('/login');
+      }
+    }
+  }, [router]);
 
-    const storedExpensesRaw = localStorage.getItem(APP_EXPENSES_STORAGE_KEY);
-    const storedIncomeRaw = localStorage.getItem(APP_INCOME_STORAGE_KEY);
+  const fetchDataAndUpdateDashboard = React.useCallback(() => {
+    if (typeof window === 'undefined' || !currentUserEmail) return;
+
+    const userExpensesKey = getUserSpecificKey(APP_EXPENSES_STORAGE_KEY_BASE, currentUserEmail);
+    const userIncomeKey = getUserSpecificKey(APP_INCOME_STORAGE_KEY_BASE, currentUserEmail);
+
+    const storedExpensesRaw = localStorage.getItem(userExpensesKey);
+    const storedIncomeRaw = localStorage.getItem(userIncomeKey);
 
     let expenses: Expense[] = [];
     let incomeTransactions: IncomeTransaction[] = [];
@@ -75,12 +100,10 @@ export default function DashboardPage() {
       console.error("Failed to parse income from localStorage", e);
     }
 
-    // Calculate Total Balance (All time)
     const totalIncomeAllTime = incomeTransactions.reduce((sum, tx) => sum + tx.amount, 0);
     const totalExpensesAllTime = expenses.reduce((sum, tx) => sum + tx.amount, 0);
     setTotalBalance(totalIncomeAllTime - totalExpensesAllTime);
 
-    // Calculate Current Month's Income and Expenses
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
@@ -100,18 +123,16 @@ export default function DashboardPage() {
     setMonthlyIncome(currentMonthIncomeTotal);
     setMonthlyExpenses(currentMonthExpensesTotal);
 
-    // Calculate Budget Utilization
     if (currentMonthIncomeTotal > 0) {
-      const utilization = Math.min((currentMonthExpensesTotal / currentMonthIncomeTotal) * 100, 100); // Cap at 100%
+      const utilization = Math.min((currentMonthExpensesTotal / currentMonthIncomeTotal) * 100, 100);
       setBudgetUtilization(parseFloat(utilization.toFixed(0)));
     } else if (currentMonthExpensesTotal > 0) {
-      setBudgetUtilization(100); // Income is 0 but expenses exist
+      setBudgetUtilization(100); 
     }
     else {
       setBudgetUtilization(0);
     }
 
-    // Prepare Chart Data (Last 6 months)
     const chartDataArray: MonthlySummary[] = [];
     for (let i = 5; i >= 0; i--) {
       const dateIterator = new Date(currentDate);
@@ -134,7 +155,7 @@ export default function DashboardPage() {
         .reduce((sum, tx) => sum + tx.amount, 0);
         
       chartDataArray.push({
-        month: format(dateIterator, 'MMMM', { locale: es }), // Use Spanish locale for month names
+        month: format(dateIterator, 'MMMM', { locale: es }), 
         year: year,
         income: monthIncome,
         expenses: monthExpenses,
@@ -142,20 +163,30 @@ export default function DashboardPage() {
     }
     setMonthlyChartData(chartDataArray);
 
-  }, []);
+  }, [currentUserEmail]);
 
   React.useEffect(() => {
-    fetchDataAndUpdateDashboard(); // Initial fetch
+    if (currentUserEmail) { // Only fetch if user is loaded
+        fetchDataAndUpdateDashboard();
+    }
 
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === APP_EXPENSES_STORAGE_KEY || event.key === APP_INCOME_STORAGE_KEY) {
-        fetchDataAndUpdateDashboard();
+      if (currentUserEmail) {
+        const userExpensesKey = getUserSpecificKey(APP_EXPENSES_STORAGE_KEY_BASE, currentUserEmail);
+        const userIncomeKey = getUserSpecificKey(APP_INCOME_STORAGE_KEY_BASE, currentUserEmail);
+        if (event.key === userExpensesKey || event.key === userIncomeKey) {
+          fetchDataAndUpdateDashboard();
+        }
       }
     };
 
     const handleLocalStorageUpdated = (event: CustomEvent) => {
-      if (event.detail?.key === APP_EXPENSES_STORAGE_KEY || event.detail?.key === APP_INCOME_STORAGE_KEY) {
-        fetchDataAndUpdateDashboard();
+      if (currentUserEmail) {
+        const userExpensesKey = getUserSpecificKey(APP_EXPENSES_STORAGE_KEY_BASE, currentUserEmail);
+        const userIncomeKey = getUserSpecificKey(APP_INCOME_STORAGE_KEY_BASE, currentUserEmail);
+        if (event.detail?.key === userExpensesKey || event.detail?.key === userIncomeKey) {
+          fetchDataAndUpdateDashboard();
+        }
       }
     };
 
@@ -166,7 +197,17 @@ export default function DashboardPage() {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener('localStorageUpdated', handleLocalStorageUpdated as EventListener);
     };
-  }, [fetchDataAndUpdateDashboard]);
+  }, [fetchDataAndUpdateDashboard, currentUserEmail]);
+
+  if (!currentUserEmail) {
+    return (
+      <AppLayout>
+        <div className="flex h-full items-center justify-center">
+          <p>Cargando datos del usuario...</p>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -179,7 +220,6 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${totalBalance.toFixed(2)}</div>
-            {/* <p className="text-xs text-muted-foreground">+5.2% del mes pasado</p> */}
           </CardContent>
         </Card>
         <Card className="shadow-md">
@@ -199,7 +239,6 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${monthlyExpenses.toFixed(2)}</div>
-            {/* <p className="text-xs text-muted-foreground">-2.1% del mes pasado</p> */}
           </CardContent>
         </Card>
         <Card className="shadow-md">
@@ -238,4 +277,3 @@ export default function DashboardPage() {
     </AppLayout>
   );
 }
-

@@ -32,6 +32,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { APP_LOGGED_IN_USER_KEY, getUserSpecificKey } from "@/lib/storageKeys";
+import { useRouter } from "next/navigation";
 
 interface IncomeTransaction {
   id: string;
@@ -41,32 +43,60 @@ interface IncomeTransaction {
   source?: string; // Optional: e.g., Salary, Freelance
 }
 
-const APP_INCOME_STORAGE_KEY = "remindme_income_transactions";
+const APP_INCOME_STORAGE_KEY_BASE = "remindme_income_transactions";
 
 export default function IncomePage() {
-  const [incomeTransactions, setIncomeTransactions] = React.useState<IncomeTransaction[]>(() => {
-    if (typeof window !== 'undefined') {
-      const storedIncome = localStorage.getItem(APP_INCOME_STORAGE_KEY);
-      if (storedIncome) {
-        try {
-          return JSON.parse(storedIncome);
-        } catch (e) {
-          console.error("Failed to parse income transactions from localStorage", e);
-        }
-      }
-    }
-    return []; 
-  });
-
+  const router = useRouter();
+  const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
+  const [incomeTransactions, setIncomeTransactions] = React.useState<IncomeTransaction[]>([]);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingTransaction, setEditingTransaction] = React.useState<IncomeTransaction | null>(null);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(APP_INCOME_STORAGE_KEY, JSON.stringify(incomeTransactions));
-      window.dispatchEvent(new CustomEvent('localStorageUpdated', { detail: { key: APP_INCOME_STORAGE_KEY } }));
+      const loggedInUserRaw = localStorage.getItem(APP_LOGGED_IN_USER_KEY);
+      if (loggedInUserRaw) {
+        try {
+          const loggedInUser = JSON.parse(loggedInUserRaw);
+          setCurrentUserEmail(loggedInUser.email);
+        } catch (e) {
+          console.error("Failed to parse logged in user", e);
+          router.push('/login');
+        }
+      } else {
+        router.push('/login');
+      }
     }
-  }, [incomeTransactions]);
+  }, [router]);
+
+  // Load income transactions for the current user
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && currentUserEmail) {
+      const userIncomeKey = getUserSpecificKey(APP_INCOME_STORAGE_KEY_BASE, currentUserEmail);
+      const storedIncome = localStorage.getItem(userIncomeKey);
+      if (storedIncome) {
+        try {
+          setIncomeTransactions(JSON.parse(storedIncome));
+        } catch (e) {
+          console.error("Failed to parse income transactions from localStorage", e);
+          setIncomeTransactions([]); // Fallback to empty
+        }
+      } else {
+        setIncomeTransactions([]); // No income for this user yet
+      }
+    } else if (typeof window !== 'undefined' && !currentUserEmail) {
+        setIncomeTransactions([]);
+    }
+  }, [currentUserEmail]);
+
+  // Save income transactions for the current user
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && currentUserEmail) {
+      const userIncomeKey = getUserSpecificKey(APP_INCOME_STORAGE_KEY_BASE, currentUserEmail);
+      localStorage.setItem(userIncomeKey, JSON.stringify(incomeTransactions));
+      window.dispatchEvent(new CustomEvent('localStorageUpdated', { detail: { key: userIncomeKey } }));
+    }
+  }, [incomeTransactions, currentUserEmail]);
 
   const handleOpenDialog = (transaction?: IncomeTransaction) => {
     setEditingTransaction(transaction || null);
@@ -96,6 +126,16 @@ export default function IncomePage() {
   const handleDeleteTransaction = (id: string) => {
     setIncomeTransactions(txns => txns.filter(t => t.id !== id));
   };
+
+  if (!currentUserEmail) {
+    return (
+      <AppLayout>
+        <div className="flex h-full items-center justify-center">
+          <p>Cargando datos del usuario...</p>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -129,7 +169,7 @@ export default function IncomePage() {
             <TableBody>
               {incomeTransactions.map((txn) => (
                 <TableRow key={txn.id}>
-                  <TableCell>{new Date(txn.date).toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(txn.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</TableCell>
                   <TableCell className="font-medium">{txn.description}</TableCell>
                   <TableCell>{txn.source || "N/A"}</TableCell>
                   <TableCell className="text-right">${txn.amount.toFixed(2)}</TableCell>
@@ -193,4 +233,3 @@ export default function IncomePage() {
     </AppLayout>
   );
 }
-
