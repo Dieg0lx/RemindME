@@ -1,5 +1,3 @@
-# Firebase Studio
+# RemindME
 
-This is a NextJS starter in Firebase Studio.
-
-To get started, take a look at src/app/page.tsx.
+App de RemindME para la clase de calida de software
