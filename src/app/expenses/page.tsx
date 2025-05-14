@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -24,7 +25,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Edit, ListChecks, PlusCircle, Trash2, MoreHorizontal } from "lucide-react";
+import { Edit, ListChecks, PlusCircle, Trash2, MoreHorizontal, Utensils, Car, Shirt, Home, Gift } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -42,14 +44,29 @@ interface Expense {
 }
 
 const initialExpenses: Expense[] = [
-  { id: "1", date: "2024-07-20", category: "Food", description: "Groceries from SuperMart", amount: 75.50 },
-  { id: "2", date: "2024-07-19", category: "Transport", description: "Monthly metro pass", amount: 55.00 },
-  { id: "3", date: "2024-07-18", category: "Entertainment", description: "Movie tickets - Space Odyssey", amount: 25.00 },
-  { id: "4", date: "2024-07-17", category: "Utilities", description: "Electricity bill", amount: 120.75 },
+  { id: "1", date: "2024-07-20", category: "Food & Dining", description: "Groceries from SuperMart", amount: 75.50 },
+  { id: "2", date: "2024-07-19", category: "Transportation", description: "Monthly metro pass", amount: 55.00 },
+  { id: "3", date: "2024-07-18", category: "Shopping", description: "Movie tickets - Space Odyssey", amount: 25.00 },
+  { id: "4", date: "2024-07-17", category: "Housing", description: "Electricity bill", amount: 120.75 },
 ];
 
-// Dummy categories for the form, in a real app this would come from a store/API
-const categories = ["Food", "Transport", "Entertainment", "Utilities", "Health", "Shopping", "Other"];
+// Define Category interface (mirrors the one in categories/page.tsx)
+interface Category {
+  id: string;
+  name: string;
+  icon: LucideIcon; 
+  color?: string;
+}
+
+// Use a similar initial categories list as in categories/page.tsx
+// In a real app, this would come from a shared store or API
+const pageCategories: Category[] = [
+  { id: "1", name: "Food & Dining", icon: Utensils, color: "hsl(30, 80%, 60%)" },
+  { id: "2", name: "Transportation", icon: Car, color: "hsl(200, 70%, 60%)" },
+  { id: "3", name: "Shopping", icon: Shirt, color: "hsl(300, 60%, 60%)" },
+  { id: "4", name: "Housing", icon: Home, color: "hsl(120, 50%, 50%)" },
+  { id: "5", name: "Gifts", icon: Gift, color: "hsl(0, 70%, 65%)" },
+];
 
 
 export default function ExpensesPage() {
@@ -76,7 +93,7 @@ export default function ExpensesPage() {
     if (editingExpense) {
       setExpenses(exps => exps.map(e => e.id === editingExpense.id ? newExpense : e));
     } else {
-      setExpenses(exps => [...exps, newExpense]);
+      setExpenses(exps => [newExpense, ...exps].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     }
     setIsDialogOpen(false);
     setEditingExpense(null);
@@ -118,7 +135,7 @@ export default function ExpensesPage() {
             <TableBody>
               {expenses.map((exp) => (
                 <TableRow key={exp.id}>
-                  <TableCell>{exp.date}</TableCell>
+                  <TableCell>{new Date(exp.date).toLocaleDateString()}</TableCell>
                   <TableCell><Badge variant="outline">{exp.category}</Badge></TableCell>
                   <TableCell className="font-medium">{exp.description}</TableCell>
                   <TableCell className="text-right">${exp.amount.toFixed(2)}</TableCell>
@@ -158,19 +175,25 @@ export default function ExpensesPage() {
           <form onSubmit={handleSaveExpense} className="space-y-4">
             <div>
               <Label htmlFor="date" className="mb-1 block">Date</Label>
-              <Input id="date" name="date" type="date" defaultValue={editingExpense?.date} required />
+              <Input id="date" name="date" type="date" defaultValue={editingExpense?.date || new Date().toISOString().split('T')[0]} required />
             </div>
             <div>
               <Label htmlFor="amount" className="mb-1 block">Amount ($)</Label>
-              <Input id="amount" name="amount" type="number" step="0.01" defaultValue={editingExpense?.amount} required />
+              <Input id="amount" name="amount" type="number" step="0.01" defaultValue={editingExpense?.amount} placeholder="0.00" required />
             </div>
              <div>
               <Label htmlFor="category" className="mb-1 block">Category</Label>
-              {/* In a real app, use Select component here */}
-              <Input id="category" name="category" list="categories" defaultValue={editingExpense?.category} required />
-               <datalist id="categories">
-                {categories.map(cat => <option key={cat} value={cat} />)}
-              </datalist>
+              <select 
+                id="category" 
+                name="category" 
+                defaultValue={editingExpense?.category || (pageCategories.length > 0 ? pageCategories[0].name : "")} 
+                required
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {pageCategories.map(cat => (
+                  <option key={cat.id} value={cat.name}>{cat.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <Label htmlFor="description" className="mb-1 block">Description</Label>
@@ -186,3 +209,4 @@ export default function ExpensesPage() {
     </AppLayout>
   );
 }
+
