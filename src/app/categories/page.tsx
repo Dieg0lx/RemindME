@@ -39,11 +39,11 @@ interface Category {
 const APP_CATEGORIES_STORAGE_KEY = "remindme_categories";
 
 const initialCategoriesData: Omit<Category, 'icon'> & { iconName: string }[] = [
-  { id: "1", name: "Food & Dining", iconName: "Utensils", color: "hsl(30, 80%, 60%)" },
-  { id: "2", name: "Transportation", iconName: "Car", color: "hsl(200, 70%, 60%)" },
-  { id: "3", name: "Shopping", iconName: "Shirt", color: "hsl(300, 60%, 60%)" },
-  { id: "4", name: "Housing", iconName: "Home", color: "hsl(120, 50%, 50%)" },
-  { id: "5", name: "Gifts", iconName: "Gift", color: "hsl(0, 70%, 65%)" },
+  { id: "1", name: "Comida y Cena", iconName: "Utensils", color: "hsl(30, 80%, 60%)" },
+  { id: "2", name: "Transporte", iconName: "Car", color: "hsl(200, 70%, 60%)" },
+  { id: "3", name: "Compras", iconName: "Shirt", color: "hsl(300, 60%, 60%)" },
+  { id: "4", name: "Vivienda", iconName: "Home", color: "hsl(120, 50%, 50%)" },
+  { id: "5", name: "Regalos", iconName: "Gift", color: "hsl(0, 70%, 65%)" },
 ];
 
 const availableIcons: { name: string; component: LucideIcon }[] = [
@@ -131,8 +131,8 @@ export default function CategoriesPage() {
   return (
     <AppLayout>
       <PageHeader
-        title="Expense Categories"
-        actionButtonText="Add Category"
+        title="Categorías de Gastos"
+        actionButtonText="Agregar Categoría"
         ActionIcon={PlusCircle}
         onActionButtonClick={() => handleOpenDialog()}
       />
@@ -140,9 +140,9 @@ export default function CategoriesPage() {
       {categories.length === 0 ? (
         <EmptyState
           IconCmp={Shapes}
-          title="No Categories Defined"
-          description="Create categories to organize your expenses effectively."
-          actionButtonText="Add First Category"
+          title="No Hay Categorías Definidas"
+          description="Crea categorías para organizar tus gastos de forma eficaz."
+          actionButtonText="Agregar Primera Categoría"
           onActionButtonClick={() => handleOpenDialog()}
         />
       ) : (
@@ -162,10 +162,10 @@ export default function CategoriesPage() {
                 </CardContent>
                 <CardFooter className="flex justify-end gap-2">
                   <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(cat)}>
-                    <Edit className="mr-1 h-4 w-4" /> Edit
+                    <Edit className="mr-1 h-4 w-4" /> Editar
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(cat.id)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                    <Trash2 className="mr-1 h-4 w-4" /> Delete
+                    <Trash2 className="mr-1 h-4 w-4" /> Eliminar
                   </Button>
                 </CardFooter>
               </Card>
@@ -177,18 +177,18 @@ export default function CategoriesPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingCategory ? "Edit" : "Add"} Category</DialogTitle>
+            <DialogTitle>{editingCategory ? "Editar" : "Agregar"} Categoría</DialogTitle>
             <DialogDescription>
-              {editingCategory ? "Update the category details." : "Create a new category for your expenses."}
+              {editingCategory ? "Actualiza los detalles de la categoría." : "Crea una nueva categoría para tus gastos."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveCategory} className="space-y-4">
             <div>
-              <Label htmlFor="name" className="mb-1 block">Category Name</Label>
+              <Label htmlFor="name" className="mb-1 block">Nombre de la Categoría</Label>
               <Input id="name" name="name" defaultValue={editingCategory?.name} required />
             </div>
             <div>
-              <Label htmlFor="icon" className="mb-1 block">Icon</Label>
+              <Label htmlFor="icon" className="mb-1 block">Ícono</Label>
               <select 
                 id="icon" 
                 name="icon" 
@@ -202,12 +202,12 @@ export default function CategoriesPage() {
               </select>
             </div>
             <div>
-              <Label htmlFor="color" className="mb-1 block">Color (Optional)</Label>
+              <Label htmlFor="color" className="mb-1 block">Color (Opcional)</Label>
               <Input id="color" name="color" type="color" defaultValue={editingCategory?.color || '#cccccc'} className="h-10 p-1"/>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-              <Button type="submit">Save Category</Button>
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+              <Button type="submit">Guardar Categoría</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -215,3 +215,4 @@ export default function CategoriesPage() {
     </AppLayout>
   );
 }
+

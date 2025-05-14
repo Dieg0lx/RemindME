@@ -31,10 +31,10 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/income", label: "Income", icon: Banknote }, // Added Income nav item
-  { href: "/expenses", label: "Expenses", icon: ListChecks },
-  { href: "/subscriptions", label: "Subscriptions", icon: CreditCard },
-  { href: "/categories", label: "Categories", icon: Shapes },
+  { href: "/income", label: "Ingresos", icon: Banknote }, 
+  { href: "/expenses", label: "Gastos", icon: ListChecks },
+  { href: "/subscriptions", label: "Suscripciones", icon: CreditCard },
+  { href: "/categories", label: "Categorías", icon: Shapes },
 ];
 
 interface AppLayoutProps {
