@@ -1,3 +1,4 @@
+tsx
 "use client";
 
 import * as React from "react";
@@ -20,19 +21,27 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Edit, PlusCircle, Trash2 } from "lucide-react";
+import { 
+  CreditCard, 
+  Edit, 
+  PlusCircle, 
+  Trash2, 
+  MoreHorizontal,
+  CheckCircle,
+  PauseCircle,
+  XCircle
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
 
 interface Subscription {
   id: string;
@@ -48,7 +57,11 @@ const initialSubscriptions: Subscription[] = [
   { id: "2", name: "Spotify Family", amount: 16.99, cycle: "Monthly", nextDueDate: "2024-08-20", status: "Active" },
   { id: "3", name: "Adobe Creative Cloud", amount: 599.88, cycle: "Yearly", nextDueDate: "2025-01-10", status: "Active" },
   { id: "4", name: "Gym Membership", amount: 45.00, cycle: "Monthly", nextDueDate: "2024-08-01", status: "Paused" },
+  { id: "5", name: "Old Service", amount: 10.00, cycle: "Monthly", nextDueDate: "2024-07-01", status: "Cancelled" },
 ];
+
+const subscriptionCycles: Subscription["cycle"][] = ["Monthly", "Yearly", "Quarterly"];
+const subscriptionStatuses: Subscription["status"][] = ["Active", "Paused", "Cancelled"];
 
 export default function SubscriptionsPage() {
   const [subscriptions, setSubscriptions] = React.useState<Subscription[]>(initialSubscriptions);
@@ -63,17 +76,17 @@ export default function SubscriptionsPage() {
   const handleSaveSubscription = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const newSubscription = {
+    const newSubscription: Subscription = {
       id: editingSubscription?.id || String(Date.now()),
       name: formData.get("name") as string,
       amount: parseFloat(formData.get("amount") as string),
       cycle: formData.get("cycle") as Subscription["cycle"],
       nextDueDate: formData.get("nextDueDate") as string,
-      status: "Active", // Default status
+      status: formData.get("status") as Subscription["status"],
     };
 
     if (editingSubscription) {
-      setSubscriptions(subs => subs.map(s => s.id === editingSubscription.id ? newSubscription : s));
+      setSubscriptions(subs => subs.map(s => (s.id === editingSubscription.id ? newSubscription : s)));
     } else {
       setSubscriptions(subs => [...subs, newSubscription]);
     }
@@ -85,6 +98,11 @@ export default function SubscriptionsPage() {
     setSubscriptions(subs => subs.filter(s => s.id !== id));
   };
 
+  const handleChangeStatus = (id: string, newStatus: Subscription['status']) => {
+    setSubscriptions(subs =>
+      subs.map(s => (s.id === id ? { ...s, status: newStatus } : s))
+    );
+  };
 
   return (
     <AppLayout>
@@ -140,6 +158,23 @@ export default function SubscriptionsPage() {
                         <DropdownMenuItem onClick={() => handleOpenDialog(sub)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {sub.status !== "Active" && (
+                          <DropdownMenuItem onClick={() => handleChangeStatus(sub.id, "Active")}>
+                            <CheckCircle className="mr-2 h-4 w-4" /> Mark as Active
+                          </DropdownMenuItem>
+                        )}
+                        {sub.status !== "Paused" && (
+                          <DropdownMenuItem onClick={() => handleChangeStatus(sub.id, "Paused")}>
+                            <PauseCircle className="mr-2 h-4 w-4" /> Mark as Paused
+                          </DropdownMenuItem>
+                        )}
+                        {sub.status !== "Cancelled" && (
+                          <DropdownMenuItem onClick={() => handleChangeStatus(sub.id, "Cancelled")}>
+                            <XCircle className="mr-2 h-4 w-4" /> Mark as Cancelled
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => handleDeleteSubscription(sub.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
                         </DropdownMenuItem>
@@ -172,17 +207,35 @@ export default function SubscriptionsPage() {
             </div>
             <div>
               <Label htmlFor="cycle" className="mb-1 block">Billing Cycle</Label>
-              {/* In a real app, use Select component here */}
-              <Input id="cycle" name="cycle" list="cycles" defaultValue={editingSubscription?.cycle} required />
-              <datalist id="cycles">
-                <option value="Monthly" />
-                <option value="Yearly" />
-                <option value="Quarterly" />
-              </datalist>
+              <select 
+                id="cycle" 
+                name="cycle" 
+                defaultValue={editingSubscription?.cycle || subscriptionCycles[0]} 
+                required
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {subscriptionCycles.map(cycle => (
+                  <option key={cycle} value={cycle}>{cycle}</option>
+                ))}
+              </select>
             </div>
             <div>
               <Label htmlFor="nextDueDate" className="mb-1 block">Next Due Date</Label>
               <Input id="nextDueDate" name="nextDueDate" type="date" defaultValue={editingSubscription?.nextDueDate} required />
+            </div>
+            <div>
+              <Label htmlFor="status" className="mb-1 block">Status</Label>
+              <select 
+                id="status" 
+                name="status" 
+                defaultValue={editingSubscription?.status || subscriptionStatuses[0]} 
+                required
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {subscriptionStatuses.map(status => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
