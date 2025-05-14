@@ -18,7 +18,7 @@ export function UserNav() {
   // In a real app, user data would come from context or a hook
   const user = {
     name: "User Name",
-    email: "user@budgetview.app",
+    email: "user@remindme.app",
     avatar: "https://picsum.photos/100/100", 
   };
 

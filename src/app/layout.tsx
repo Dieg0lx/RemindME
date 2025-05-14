@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({ // Corrected variable name
 });
 
 export const metadata: Metadata = {
-  title: 'BudgetView',
-  description: 'Manage your personal budget with ease.',
+  title: 'RemindME',
+  description: 'Your personal reminder assistant.',
 };
 
 export default function RootLayout({

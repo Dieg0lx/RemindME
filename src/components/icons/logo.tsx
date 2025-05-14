@@ -7,7 +7,7 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
       viewBox="0 0 200 50"
       width="120"
       height="30"
-      aria-label="BudgetView Logo"
+      aria-label="RemindME Logo"
       {...props}
     >
       <rect width="100%" height="100%" rx="5" fill="hsl(var(--logo-background-sidebar))" />
@@ -21,7 +21,7 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
         fontWeight="bold"
         fill="hsl(var(--logo-foreground-sidebar))"
       >
-        BudgetView
+        RemindME
       </text>
     </svg>
   );
