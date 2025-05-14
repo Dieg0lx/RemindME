@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -16,23 +17,33 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Edit, PlusCircle, Shapes, Trash2, Utensils, Car, Shirt, Home, Gift } from "lucide-react"; // Example icons
+import { Edit, PlusCircle, Shapes, Trash2, Utensils, Car, Shirt, Home, Gift } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+// Interface for category data used in localStorage (icon as string name)
+interface StoredCategory {
+  id: string;
+  name: string;
+  iconName: string;
+  color?: string;
+}
 
+// Interface for category data used in component state (icon as LucideIcon component)
 interface Category {
   id: string;
   name: string;
   icon: LucideIcon; 
-  color?: string; // Optional color for the category badge/icon
+  color?: string;
 }
 
-const initialCategories: Category[] = [
-  { id: "1", name: "Food & Dining", icon: Utensils, color: "hsl(30, 80%, 60%)" },
-  { id: "2", name: "Transportation", icon: Car, color: "hsl(200, 70%, 60%)" },
-  { id: "3", name: "Shopping", icon: Shirt, color: "hsl(300, 60%, 60%)" },
-  { id: "4", name: "Housing", icon: Home, color: "hsl(120, 50%, 50%)" },
-  { id: "5", name: "Gifts", icon: Gift, color: "hsl(0, 70%, 65%)" },
+const APP_CATEGORIES_STORAGE_KEY = "remindme_categories";
+
+const initialCategoriesData: Omit<Category, 'icon'> & { iconName: string }[] = [
+  { id: "1", name: "Food & Dining", iconName: "Utensils", color: "hsl(30, 80%, 60%)" },
+  { id: "2", name: "Transportation", iconName: "Car", color: "hsl(200, 70%, 60%)" },
+  { id: "3", name: "Shopping", iconName: "Shirt", color: "hsl(300, 60%, 60%)" },
+  { id: "4", name: "Housing", iconName: "Home", color: "hsl(120, 50%, 50%)" },
+  { id: "5", name: "Gifts", iconName: "Gift", color: "hsl(0, 70%, 65%)" },
 ];
 
 const availableIcons: { name: string; component: LucideIcon }[] = [
@@ -44,10 +55,47 @@ const availableIcons: { name: string; component: LucideIcon }[] = [
     { name: "Shapes", component: Shapes }, // Default
 ];
 
+const mapStoredToCategory = (storedCat: StoredCategory): Category => ({
+  ...storedCat,
+  icon: availableIcons.find(i => i.name === storedCat.iconName)?.component || Shapes,
+});
+
+const mapCategoryToStored = (cat: Category): StoredCategory => ({
+  ...cat,
+  iconName: availableIcons.find(i => i.component === cat.icon)?.name || "Shapes",
+});
+
 export default function CategoriesPage() {
-  const [categories, setCategories] = React.useState<Category[]>(initialCategories);
+  const [categories, setCategories] = React.useState<Category[]>(() => {
+    if (typeof window !== 'undefined') {
+      const storedCategoriesRaw = localStorage.getItem(APP_CATEGORIES_STORAGE_KEY);
+      if (storedCategoriesRaw) {
+        try {
+          const storedCategories: StoredCategory[] = JSON.parse(storedCategoriesRaw);
+          return storedCategories.map(mapStoredToCategory);
+        } catch (e) {
+          console.error("Failed to parse categories from localStorage", e);
+        }
+      }
+    }
+    return initialCategoriesData.map(data => ({
+      ...data,
+      icon: availableIcons.find(i => i.name === data.iconName)?.component || Shapes,
+    }));
+  });
+
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingCategory, setEditingCategory] = React.useState<Category | null>(null);
+
+  React.useEffect(() => {
+    // Save to localStorage whenever categories change
+    if (typeof window !== 'undefined') {
+      const storedCategories = categories.map(mapCategoryToStored);
+      localStorage.setItem(APP_CATEGORIES_STORAGE_KEY, JSON.stringify(storedCategories));
+      window.dispatchEvent(new CustomEvent('categoriesUpdated'));
+    }
+  }, [categories]);
+
 
   const handleOpenDialog = (category?: Category) => {
     setEditingCategory(category || null);
@@ -60,7 +108,7 @@ export default function CategoriesPage() {
     const selectedIconName = formData.get("icon") as string;
     const selectedIcon = availableIcons.find(i => i.name === selectedIconName)?.component || Shapes;
 
-    const newCategory: Category = {
+    const newCategoryData: Category = {
       id: editingCategory?.id || String(Date.now()),
       name: formData.get("name") as string,
       icon: selectedIcon,
@@ -68,9 +116,9 @@ export default function CategoriesPage() {
     };
 
     if (editingCategory) {
-      setCategories(cats => cats.map(c => c.id === editingCategory.id ? newCategory : c));
+      setCategories(cats => cats.map(c => c.id === editingCategory.id ? newCategoryData : c));
     } else {
-      setCategories(cats => [...cats, newCategory]);
+      setCategories(cats => [...cats, newCategoryData]);
     }
     setIsDialogOpen(false);
     setEditingCategory(null);
@@ -110,7 +158,7 @@ export default function CategoriesPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">Used in X expenses this month.</p> {/* Placeholder */}
+                  {/* Content can be added here if needed */}
                 </CardContent>
                 <CardFooter className="flex justify-end gap-2">
                   <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(cat)}>
@@ -141,7 +189,6 @@ export default function CategoriesPage() {
             </div>
             <div>
               <Label htmlFor="icon" className="mb-1 block">Icon</Label>
-              {/* In a real app, use Select component here */}
               <select 
                 id="icon" 
                 name="icon" 
@@ -168,3 +215,5 @@ export default function CategoriesPage() {
     </AppLayout>
   );
 }
+
+    

@@ -25,7 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Edit, ListChecks, PlusCircle, Trash2, MoreHorizontal, Utensils, Car, Shirt, Home, Gift } from "lucide-react";
+import { Edit, ListChecks, PlusCircle, Trash2, MoreHorizontal, Utensils, Car, Shirt, Home, Gift, Shapes } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -38,10 +38,28 @@ import {
 interface Expense {
   id: string;
   date: string;
-  category: string;
+  category: string; // Category name
   description: string;
   amount: number;
 }
+
+// Interface for category data used in localStorage (icon as string name)
+interface StoredCategory {
+  id: string;
+  name: string;
+  iconName: string;
+  color?: string;
+}
+
+// Interface for category data used in component state (icon as LucideIcon component)
+interface Category {
+  id: string;
+  name: string;
+  icon: LucideIcon; 
+  color?: string;
+}
+
+const APP_CATEGORIES_STORAGE_KEY = "remindme_categories";
 
 const initialExpenses: Expense[] = [
   { id: "1", date: "2024-07-20", category: "Food & Dining", description: "Groceries from SuperMart", amount: 75.50 },
@@ -50,29 +68,74 @@ const initialExpenses: Expense[] = [
   { id: "4", date: "2024-07-17", category: "Housing", description: "Electricity bill", amount: 120.75 },
 ];
 
-// Define Category interface (mirrors the one in categories/page.tsx)
-interface Category {
-  id: string;
-  name: string;
-  icon: LucideIcon; 
-  color?: string;
-}
+const availableIcons: { name: string; component: LucideIcon }[] = [
+    { name: "Utensils", component: Utensils },
+    { name: "Car", component: Car },
+    { name: "Shirt", component: Shirt },
+    { name: "Home", component: Home },
+    { name: "Gift", component: Gift },
+    { name: "Shapes", component: Shapes }, // Default
+];
 
-// Use a similar initial categories list as in categories/page.tsx
-// In a real app, this would come from a shared store or API
-const pageCategories: Category[] = [
-  { id: "1", name: "Food & Dining", icon: Utensils, color: "hsl(30, 80%, 60%)" },
-  { id: "2", name: "Transportation", icon: Car, color: "hsl(200, 70%, 60%)" },
-  { id: "3", name: "Shopping", icon: Shirt, color: "hsl(300, 60%, 60%)" },
-  { id: "4", name: "Housing", icon: Home, color: "hsl(120, 50%, 50%)" },
-  { id: "5", name: "Gifts", icon: Gift, color: "hsl(0, 70%, 65%)" },
+const mapStoredToCategory = (storedCat: StoredCategory): Category => ({
+  ...storedCat,
+  icon: availableIcons.find(i => i.name === storedCat.iconName)?.component || Shapes,
+});
+
+// Default categories if nothing in localStorage (should match initialCategoriesData in categories/page.tsx)
+const defaultPageCategoriesData: StoredCategory[] = [
+  { id: "1", name: "Food & Dining", iconName: "Utensils", color: "hsl(30, 80%, 60%)" },
+  { id: "2", name: "Transportation", iconName: "Car", color: "hsl(200, 70%, 60%)" },
+  { id: "3", name: "Shopping", iconName: "Shirt", color: "hsl(300, 60%, 60%)" },
+  { id: "4", name: "Housing", iconName: "Home", color: "hsl(120, 50%, 50%)" },
+  { id: "5", name: "Gifts", iconName: "Gift", color: "hsl(0, 70%, 65%)" },
 ];
 
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = React.useState<Expense[]>(initialExpenses);
+  const [pageCategories, setPageCategories] = React.useState<Category[]>(() => defaultPageCategoriesData.map(mapStoredToCategory));
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingExpense, setEditingExpense] = React.useState<Expense | null>(null);
+
+  React.useEffect(() => {
+    const loadCategories = () => {
+      if (typeof window === 'undefined') return;
+      const storedCategoriesRaw = localStorage.getItem(APP_CATEGORIES_STORAGE_KEY);
+      if (storedCategoriesRaw) {
+        try {
+          const storedCategories: StoredCategory[] = JSON.parse(storedCategoriesRaw);
+          setPageCategories(storedCategories.map(mapStoredToCategory));
+        } catch (e) {
+          console.error("Failed to parse categories from localStorage for expenses page", e);
+          setPageCategories(defaultPageCategoriesData.map(mapStoredToCategory));
+        }
+      } else {
+         setPageCategories(defaultPageCategoriesData.map(mapStoredToCategory));
+      }
+    };
+
+    loadCategories(); // Load on mount
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === APP_CATEGORIES_STORAGE_KEY) {
+        loadCategories();
+      }
+    };
+    
+    const handleCategoriesUpdated = () => {
+        loadCategories();
+    };
+
+    window.addEventListener('storage', handleStorageChange); // For changes in other tabs
+    window.addEventListener('categoriesUpdated', handleCategoriesUpdated); // For changes in the same tab
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('categoriesUpdated', handleCategoriesUpdated);
+    };
+  }, []);
+
 
   const handleOpenDialog = (expense?: Expense) => {
     setEditingExpense(expense || null);
@@ -85,7 +148,7 @@ export default function ExpensesPage() {
     const newExpense = {
       id: editingExpense?.id || String(Date.now()),
       date: formData.get("date") as string,
-      category: formData.get("category") as string,
+      category: formData.get("category") as string, // This is the category name
       description: formData.get("description") as string,
       amount: parseFloat(formData.get("amount") as string),
     };
@@ -102,6 +165,11 @@ export default function ExpensesPage() {
   const handleDeleteExpense = (id: string) => {
     setExpenses(exps => exps.filter(e => e.id !== id));
   };
+
+  const getCategoryDetails = (categoryName: string): Category | undefined => {
+    return pageCategories.find(cat => cat.name === categoryName);
+  };
+
 
   return (
     <AppLayout>
@@ -133,32 +201,45 @@ export default function ExpensesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {expenses.map((exp) => (
-                <TableRow key={exp.id}>
-                  <TableCell>{new Date(exp.date).toLocaleDateString()}</TableCell>
-                  <TableCell><Badge variant="outline">{exp.category}</Badge></TableCell>
-                  <TableCell className="font-medium">{exp.description}</TableCell>
-                  <TableCell className="text-right">${exp.amount.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenDialog(exp)}>
-                          <Edit className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteExpense(exp.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {expenses.map((exp) => {
+                const categoryDetails = getCategoryDetails(exp.category);
+                const IconCmp = categoryDetails?.icon || Shapes; // Fallback icon
+                return (
+                  <TableRow key={exp.id}>
+                    <TableCell>{new Date(exp.date).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant="outline" 
+                        style={categoryDetails?.color ? { borderColor: categoryDetails.color, color: categoryDetails.color } : {}}
+                        className="flex items-center gap-1.5"
+                      >
+                        <IconCmp className="h-3.5 w-3.5" style={categoryDetails?.color ? { color: categoryDetails.color } : {}}/>
+                        {exp.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{exp.description}</TableCell>
+                    <TableCell className="text-right">${exp.amount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenDialog(exp)}>
+                            <Edit className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteExpense(exp.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -190,6 +271,7 @@ export default function ExpensesPage() {
                 required
                 className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
+                {pageCategories.length === 0 && <option disabled value="">No categories available</option>}
                 {pageCategories.map(cat => (
                   <option key={cat.id} value={cat.name}>{cat.name}</option>
                 ))}
@@ -210,3 +292,4 @@ export default function ExpensesPage() {
   );
 }
 
+    
