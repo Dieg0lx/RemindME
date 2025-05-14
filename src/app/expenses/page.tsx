@@ -59,6 +59,7 @@ interface Category {
   color?: string;
 }
 
+const APP_EXPENSES_STORAGE_KEY = "remindme_expenses";
 const APP_CATEGORIES_STORAGE_KEY = "remindme_categories";
 
 const initialExpenses: Expense[] = [
@@ -93,10 +94,29 @@ const defaultPageCategoriesData: StoredCategory[] = [
 
 
 export default function ExpensesPage() {
-  const [expenses, setExpenses] = React.useState<Expense[]>(initialExpenses);
+  const [expenses, setExpenses] = React.useState<Expense[]>(() => {
+    if (typeof window !== 'undefined') {
+      const storedExpenses = localStorage.getItem(APP_EXPENSES_STORAGE_KEY);
+      if (storedExpenses) {
+        try {
+          return JSON.parse(storedExpenses);
+        } catch (e) {
+          console.error("Failed to parse expenses from localStorage", e);
+        }
+      }
+    }
+    return initialExpenses;
+  });
   const [pageCategories, setPageCategories] = React.useState<Category[]>(() => defaultPageCategoriesData.map(mapStoredToCategory));
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingExpense, setEditingExpense] = React.useState<Expense | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(APP_EXPENSES_STORAGE_KEY, JSON.stringify(expenses));
+      window.dispatchEvent(new CustomEvent('localStorageUpdated', { detail: { key: APP_EXPENSES_STORAGE_KEY } }));
+    }
+  }, [expenses]);
 
   React.useEffect(() => {
     const loadCategories = () => {
@@ -118,21 +138,23 @@ export default function ExpensesPage() {
     loadCategories(); // Load on mount
 
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === APP_CATEGORIES_STORAGE_KEY) {
+      if (event.key === APP_CATEGORIES_STORAGE_KEY || event.key === APP_EXPENSES_STORAGE_KEY) {
         loadCategories();
       }
     };
     
-    const handleCategoriesUpdated = () => {
-        loadCategories();
+    const handleLocalStorageUpdated = (event: CustomEvent) => {
+        if (event.detail?.key === APP_CATEGORIES_STORAGE_KEY || event.detail?.key === APP_EXPENSES_STORAGE_KEY) {
+            loadCategories();
+        }
     };
 
-    window.addEventListener('storage', handleStorageChange); // For changes in other tabs
-    window.addEventListener('categoriesUpdated', handleCategoriesUpdated); // For changes in the same tab
+    window.addEventListener('storage', handleStorageChange); 
+    window.addEventListener('localStorageUpdated', handleLocalStorageUpdated as EventListener);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('categoriesUpdated', handleCategoriesUpdated);
+      window.removeEventListener('localStorageUpdated', handleLocalStorageUpdated as EventListener);
     };
   }, []);
 
@@ -148,7 +170,7 @@ export default function ExpensesPage() {
     const newExpense = {
       id: editingExpense?.id || String(Date.now()),
       date: formData.get("date") as string,
-      category: formData.get("category") as string, // This is the category name
+      category: formData.get("category") as string, 
       description: formData.get("description") as string,
       amount: parseFloat(formData.get("amount") as string),
     };
@@ -203,7 +225,7 @@ export default function ExpensesPage() {
             <TableBody>
               {expenses.map((exp) => {
                 const categoryDetails = getCategoryDetails(exp.category);
-                const IconCmp = categoryDetails?.icon || Shapes; // Fallback icon
+                const IconCmp = categoryDetails?.icon || Shapes; 
                 return (
                   <TableRow key={exp.id}>
                     <TableCell>{new Date(exp.date).toLocaleDateString()}</TableCell>
@@ -279,7 +301,7 @@ export default function ExpensesPage() {
             </div>
             <div>
               <Label htmlFor="description" className="mb-1 block">Description</Label>
-              <Textarea id="description" name="description" defaultValue={editingExpense?.description} placeholder="e.g., Lunch with colleagues" />
+              <Textarea id="description" name="description" defaultValue={editingExpense?.description} placeholder="e.g., Lunch with colleagues" required />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
@@ -291,5 +313,3 @@ export default function ExpensesPage() {
     </AppLayout>
   );
 }
-
-    

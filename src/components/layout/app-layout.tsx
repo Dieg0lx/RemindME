@@ -1,3 +1,4 @@
+
 "use client";
 
 import type * as React from "react";
@@ -23,14 +24,16 @@ import {
   CreditCard,
   ListChecks,
   Shapes,
+  Banknote, // Added Banknote icon
   SettingsIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/subscriptions", label: "Subscriptions", icon: CreditCard },
+  { href: "/income", label: "Income", icon: Banknote }, // Added Income nav item
   { href: "/expenses", label: "Expenses", icon: ListChecks },
+  { href: "/subscriptions", label: "Subscriptions", icon: CreditCard },
   { href: "/categories", label: "Categories", icon: Shapes },
 ];
 
@@ -87,3 +90,4 @@ export function AppLayout({ children }: AppLayoutProps) {
     </SidebarProvider>
   );
 }
+

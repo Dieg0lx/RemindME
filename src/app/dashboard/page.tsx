@@ -1,21 +1,40 @@
+
 "use client";
 
+import * as React from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { DollarSign, TrendingUp, TrendingDown, Wallet } from "lucide-react";
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip as ChartTooltip, Legend } from "recharts";
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip as ChartTooltipRecharts, Legend } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
+import { format } from 'date-fns';
 
-const chartData = [
-  { month: "January", expenses: 1860, income: 2500 },
-  { month: "February", expenses: 2050, income: 2600 },
-  { month: "March", expenses: 1970, income: 2700 },
-  { month: "April", expenses: 2240, income: 2800 },
-  { month: "May", expenses: 1900, income: 2900 },
-  { month: "June", expenses: 2300, income: 3000 },
-];
+const APP_EXPENSES_STORAGE_KEY = "remindme_expenses";
+const APP_INCOME_STORAGE_KEY = "remindme_income_transactions";
+
+interface Expense {
+  id: string;
+  date: string;
+  category: string;
+  description: string;
+  amount: number;
+}
+
+interface IncomeTransaction {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+}
+
+interface MonthlySummary {
+  month: string; // e.g., "July"
+  year: number;
+  expenses: number;
+  income: number;
+}
 
 const chartConfig = {
   income: {
@@ -28,8 +47,126 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-
 export default function DashboardPage() {
+  const [totalBalance, setTotalBalance] = React.useState<number>(0);
+  const [monthlyIncome, setMonthlyIncome] = React.useState<number>(0);
+  const [monthlyExpenses, setMonthlyExpenses] = React.useState<number>(0);
+  const [budgetUtilization, setBudgetUtilization] = React.useState<number>(0);
+  const [monthlyChartData, setMonthlyChartData] = React.useState<MonthlySummary[]>([]);
+
+  const fetchDataAndUpdateDashboard = React.useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    const storedExpensesRaw = localStorage.getItem(APP_EXPENSES_STORAGE_KEY);
+    const storedIncomeRaw = localStorage.getItem(APP_INCOME_STORAGE_KEY);
+
+    let expenses: Expense[] = [];
+    let incomeTransactions: IncomeTransaction[] = [];
+
+    try {
+      if (storedExpensesRaw) expenses = JSON.parse(storedExpensesRaw);
+    } catch (e) {
+      console.error("Failed to parse expenses from localStorage", e);
+    }
+    try {
+      if (storedIncomeRaw) incomeTransactions = JSON.parse(storedIncomeRaw);
+    } catch (e) {
+      console.error("Failed to parse income from localStorage", e);
+    }
+
+    // Calculate Total Balance (All time)
+    const totalIncomeAllTime = incomeTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+    const totalExpensesAllTime = expenses.reduce((sum, tx) => sum + tx.amount, 0);
+    setTotalBalance(totalIncomeAllTime - totalExpensesAllTime);
+
+    // Calculate Current Month's Income and Expenses
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+
+    const currentMonthIncomeTxns = incomeTransactions.filter(tx => {
+      const txDate = new Date(tx.date);
+      return txDate.getFullYear() === currentYear && txDate.getMonth() === currentMonth;
+    });
+    const currentMonthExpensesTxns = expenses.filter(tx => {
+      const txDate = new Date(tx.date);
+      return txDate.getFullYear() === currentYear && txDate.getMonth() === currentMonth;
+    });
+
+    const currentMonthIncomeTotal = currentMonthIncomeTxns.reduce((sum, tx) => sum + tx.amount, 0);
+    const currentMonthExpensesTotal = currentMonthExpensesTxns.reduce((sum, tx) => sum + tx.amount, 0);
+    
+    setMonthlyIncome(currentMonthIncomeTotal);
+    setMonthlyExpenses(currentMonthExpensesTotal);
+
+    // Calculate Budget Utilization
+    if (currentMonthIncomeTotal > 0) {
+      const utilization = Math.min((currentMonthExpensesTotal / currentMonthIncomeTotal) * 100, 100); // Cap at 100%
+      setBudgetUtilization(parseFloat(utilization.toFixed(0)));
+    } else if (currentMonthExpensesTotal > 0) {
+      setBudgetUtilization(100); // Income is 0 but expenses exist
+    }
+    else {
+      setBudgetUtilization(0);
+    }
+
+    // Prepare Chart Data (Last 6 months)
+    const chartDataArray: MonthlySummary[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const dateIterator = new Date(currentDate);
+      dateIterator.setMonth(currentDate.getMonth() - i);
+      const month = dateIterator.getMonth();
+      const year = dateIterator.getFullYear();
+
+      const monthIncome = incomeTransactions
+        .filter(tx => {
+          const txDate = new Date(tx.date);
+          return txDate.getFullYear() === year && txDate.getMonth() === month;
+        })
+        .reduce((sum, tx) => sum + tx.amount, 0);
+
+      const monthExpenses = expenses
+        .filter(tx => {
+          const txDate = new Date(tx.date);
+          return txDate.getFullYear() === year && txDate.getMonth() === month;
+        })
+        .reduce((sum, tx) => sum + tx.amount, 0);
+        
+      chartDataArray.push({
+        month: format(dateIterator, 'MMMM'),
+        year: year,
+        income: monthIncome,
+        expenses: monthExpenses,
+      });
+    }
+    setMonthlyChartData(chartDataArray);
+
+  }, []);
+
+  React.useEffect(() => {
+    fetchDataAndUpdateDashboard(); // Initial fetch
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === APP_EXPENSES_STORAGE_KEY || event.key === APP_INCOME_STORAGE_KEY) {
+        fetchDataAndUpdateDashboard();
+      }
+    };
+
+    const handleLocalStorageUpdated = (event: CustomEvent) => {
+      if (event.detail?.key === APP_EXPENSES_STORAGE_KEY || event.detail?.key === APP_INCOME_STORAGE_KEY) {
+        fetchDataAndUpdateDashboard();
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener('localStorageUpdated', handleLocalStorageUpdated as EventListener);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener('localStorageUpdated', handleLocalStorageUpdated as EventListener);
+    };
+  }, [fetchDataAndUpdateDashboard]);
+
   return (
     <AppLayout>
       <PageHeader title="Dashboard" />
@@ -40,8 +177,8 @@ export default function DashboardPage() {
             <Wallet className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$12,345.67</div>
-            <p className="text-xs text-muted-foreground">+5.2% from last month</p>
+            <div className="text-2xl font-bold">${totalBalance.toFixed(2)}</div>
+            {/* <p className="text-xs text-muted-foreground">+5.2% from last month</p> */}
           </CardContent>
         </Card>
         <Card className="shadow-md">
@@ -50,7 +187,7 @@ export default function DashboardPage() {
             <TrendingUp className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$4,500.00</div>
+            <div className="text-2xl font-bold">${monthlyIncome.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">Current month</p>
           </CardContent>
         </Card>
@@ -60,18 +197,18 @@ export default function DashboardPage() {
             <TrendingDown className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$2,350.80</div>
-            <p className="text-xs text-muted-foreground">-2.1% from last month</p>
+            <div className="text-2xl font-bold">${monthlyExpenses.toFixed(2)}</div>
+            {/* <p className="text-xs text-muted-foreground">-2.1% from last month</p> */}
           </CardContent>
         </Card>
         <Card className="shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Budget Progress</CardTitle>
+            <CardTitle className="text-sm font-medium">Budget Utilization</CardTitle>
             <DollarSign className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">52% Utilized</div>
-            <Progress value={52} className="mt-2 h-2" />
+            <div className="text-2xl font-bold">{budgetUtilization}% Utilized</div>
+            <Progress value={budgetUtilization} className="mt-2 h-2" />
           </CardContent>
         </Card>
       </div>
@@ -84,10 +221,10 @@ export default function DashboardPage() {
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                <BarChart data={monthlyChartData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                   <XAxis dataKey="month" tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <YAxis tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `$${value}`} />
-                   <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                   <ChartTooltipRecharts cursor={false} content={<ChartTooltipContent indicator="dot" />} />
                   <Legend />
                   <Bar dataKey="income" fill="var(--color-income)" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="expenses" fill="var(--color-expenses)" radius={[4, 4, 0, 0]} />

@@ -92,7 +92,7 @@ export default function CategoriesPage() {
     if (typeof window !== 'undefined') {
       const storedCategories = categories.map(mapCategoryToStored);
       localStorage.setItem(APP_CATEGORIES_STORAGE_KEY, JSON.stringify(storedCategories));
-      window.dispatchEvent(new CustomEvent('categoriesUpdated'));
+      window.dispatchEvent(new CustomEvent('localStorageUpdated', { detail: { key: APP_CATEGORIES_STORAGE_KEY } }));
     }
   }, [categories]);
 
@@ -215,5 +215,3 @@ export default function CategoriesPage() {
     </AppLayout>
   );
 }
-
-    
