@@ -189,8 +189,8 @@ export default function ExpensesPage() {
   return (
     <AppLayout>
       <PageHeader
-        title="Expenses"
-        actionButtonText="Add Expense"
+        title="Gastos"
+        actionButtonText="Agregar Gasto"
         ActionIcon={PlusCircle}
         onActionButtonClick={() => handleOpenDialog()}
       />
@@ -198,9 +198,9 @@ export default function ExpensesPage() {
       {expenses.length === 0 ? (
         <EmptyState
           IconCmp={ListChecks}
-          title="No Expenses Recorded"
-          description="Start tracking your expenses to get a better view of your finances."
-          actionButtonText="Add First Expense"
+          title="No Hay Gastos Registrados"
+          description="Comienza a registrar tus gastos para tener una mejor visión de tus finanzas."
+          actionButtonText="Agregar Primer Gasto"
           onActionButtonClick={() => handleOpenDialog()}
         />
       ) : (
@@ -208,11 +208,11 @@ export default function ExpensesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Categoría</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead className="text-right">Monto</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -238,16 +238,16 @@ export default function ExpensesPage() {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
+                            <span className="sr-only">Abrir menú</span>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleOpenDialog(exp)}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit
+                            <Edit className="mr-2 h-4 w-4" /> Editar
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDeleteExpense(exp.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -263,22 +263,22 @@ export default function ExpensesPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingExpense ? "Edit" : "Add"} Expense</DialogTitle>
+            <DialogTitle>{editingExpense ? "Editar" : "Agregar"} Gasto</DialogTitle>
             <DialogDescription>
-              {editingExpense ? "Update the details of your expense." : "Enter the details for the new expense."}
+              {editingExpense ? "Actualiza los detalles de tu gasto." : "Ingresa los detalles para el nuevo gasto."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveExpense} className="space-y-4">
             <div>
-              <Label htmlFor="date" className="mb-1 block">Date</Label>
+              <Label htmlFor="date" className="mb-1 block">Fecha</Label>
               <Input id="date" name="date" type="date" defaultValue={editingExpense?.date || new Date().toISOString().split('T')[0]} required />
             </div>
             <div>
-              <Label htmlFor="amount" className="mb-1 block">Amount ($)</Label>
+              <Label htmlFor="amount" className="mb-1 block">Monto ($)</Label>
               <Input id="amount" name="amount" type="number" step="0.01" defaultValue={editingExpense?.amount} placeholder="0.00" required />
             </div>
              <div>
-              <Label htmlFor="category" className="mb-1 block">Category</Label>
+              <Label htmlFor="category" className="mb-1 block">Categoría</Label>
               <select 
                 id="category" 
                 name="category" 
@@ -287,19 +287,19 @@ export default function ExpensesPage() {
                 disabled={pageCategories.length === 0}
                 className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {pageCategories.length === 0 && <option disabled value="">No categories available. Please add a category first.</option>}
+                {pageCategories.length === 0 && <option disabled value="">No hay categorías disponibles. Agregue una categoría primero.</option>}
                 {pageCategories.map(cat => (
                   <option key={cat.id} value={cat.name}>{cat.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <Label htmlFor="description" className="mb-1 block">Description</Label>
-              <Textarea id="description" name="description" defaultValue={editingExpense?.description} placeholder="e.g., Lunch with colleagues" required />
+              <Label htmlFor="description" className="mb-1 block">Descripción</Label>
+              <Textarea id="description" name="description" defaultValue={editingExpense?.description} placeholder="Ej: Almuerzo con colegas" required />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={pageCategories.length === 0}>Save Expense</Button>
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={pageCategories.length === 0}>Guardar Gasto</Button>
             </DialogFooter>
           </form>
         </DialogContent>
