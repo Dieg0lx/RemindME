@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { DollarSign, TrendingUp, TrendingDown, Wallet, CalendarClock } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip as ChartTooltipRecharts, Legend } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
-import { format, addMonths, addQuarters, addYears, parseISO } from 'date-fns';
+import { format, parseISO, addMonths, addQuarters, addYears, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale'; 
 import { APP_LOGGED_IN_USER_KEY, getUserSpecificKey } from "@/lib/storageKeys";
 import { useRouter } from "next/navigation";
@@ -18,6 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 const APP_EXPENSES_STORAGE_KEY_BASE = "remindme_expenses";
 const APP_INCOME_STORAGE_KEY_BASE = "remindme_income_transactions";
 const APP_SUBSCRIPTIONS_STORAGE_KEY_BASE = "remindme_subscriptions";
+const SUBSCRIPTION_EXPENSE_CATEGORY = "Suscripciones";
 
 interface Expense {
   id: string;
@@ -102,12 +103,12 @@ export default function DashboardPage() {
     const storedIncomeRaw = localStorage.getItem(userIncomeKey);
     const storedSubscriptionsRaw = localStorage.getItem(userSubscriptionsKey);
 
-    let expenses: Expense[] = [];
+    let currentExpenses: Expense[] = [];
     let incomeTransactions: IncomeTransaction[] = [];
     let rawSubscriptions: Subscription[] = [];
 
     try {
-      if (storedExpensesRaw) expenses = JSON.parse(storedExpensesRaw);
+      if (storedExpensesRaw) currentExpenses = JSON.parse(storedExpensesRaw);
     } catch (e) { console.error("Failed to parse expenses from localStorage", e); }
     try {
       if (storedIncomeRaw) incomeTransactions = JSON.parse(storedIncomeRaw);
@@ -116,44 +117,59 @@ export default function DashboardPage() {
       if (storedSubscriptionsRaw) rawSubscriptions = JSON.parse(storedSubscriptionsRaw);
     } catch (e) { console.error("Failed to parse subscriptions from localStorage", e); }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfDay(new Date());
+    const newlyGeneratedSubscriptionExpenses: Expense[] = [];
 
-    const processedSubscriptions = rawSubscriptions.map(sub => {
-      if (sub.status === "Activa") {
-        let dueDate = parseISO(sub.nextDueDate); 
-        if (dueDate < today) {
-          let newNextDueDate = parseISO(sub.nextDueDate);
-          do {
-            switch (sub.cycle) {
-              case "Mensual":
-                newNextDueDate = addMonths(newNextDueDate, 1);
-                break;
-              case "Trimestral":
-                newNextDueDate = addQuarters(newNextDueDate, 1); 
-                break;
-              case "Anual":
-                newNextDueDate = addYears(newNextDueDate, 1);
-                break;
-            }
-          } while (newNextDueDate < today);
-          
-          return {
-            ...sub,
-            nextDueDate: format(newNextDueDate, 'yyyy-MM-dd')
-          };
+    const updatedSubscriptions = rawSubscriptions.map(sub => {
+      let currentSub = { ...sub };
+      if (currentSub.status === "Activa") {
+        let paymentDate = parseISO(currentSub.nextDueDate);
+        
+        while (isBefore(paymentDate, today)) {
+          const expenseIdForSubscriptionPayment = `sub_${currentSub.id}_${format(paymentDate, 'yyyy-MM-dd')}`;
+          const expenseExists = currentExpenses.some(exp => exp.id === expenseIdForSubscriptionPayment) || 
+                                newlyGeneratedSubscriptionExpenses.some(exp => exp.id === expenseIdForSubscriptionPayment);
+
+          if (!expenseExists) {
+            newlyGeneratedSubscriptionExpenses.push({
+              id: expenseIdForSubscriptionPayment,
+              date: format(paymentDate, 'yyyy-MM-dd'),
+              category: SUBSCRIPTION_EXPENSE_CATEGORY,
+              description: `Pago de suscripción: ${currentSub.name}`,
+              amount: currentSub.amount,
+            });
+          }
+
+          switch (currentSub.cycle) {
+            case "Mensual":
+              paymentDate = addMonths(paymentDate, 1);
+              break;
+            case "Trimestral":
+              paymentDate = addQuarters(paymentDate, 1);
+              break;
+            case "Anual":
+              paymentDate = addYears(paymentDate, 1);
+              break;
+          }
         }
+        currentSub.nextDueDate = format(paymentDate, 'yyyy-MM-dd');
       }
-      return sub; 
+      return currentSub;
     });
     
-    if (currentUserEmail) { // Ensure currentUserEmail is not null before setting item
-        localStorage.setItem(userSubscriptionsKey, JSON.stringify(processedSubscriptions));
+    const finalExpenses = [...currentExpenses, ...newlyGeneratedSubscriptionExpenses].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    if (currentUserEmail) {
+      if (newlyGeneratedSubscriptionExpenses.length > 0) {
+        localStorage.setItem(userExpensesKey, JSON.stringify(finalExpenses));
+        window.dispatchEvent(new CustomEvent('localStorageUpdated', { detail: { key: userExpensesKey } }));
+      }
+      localStorage.setItem(userSubscriptionsKey, JSON.stringify(updatedSubscriptions));
+      window.dispatchEvent(new CustomEvent('localStorageUpdated', { detail: { key: userSubscriptionsKey } }));
     }
     
-
     const totalIncomeAllTime = incomeTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-    const totalExpensesAllTime = expenses.reduce((sum, tx) => sum + tx.amount, 0);
+    const totalExpensesAllTime = finalExpenses.reduce((sum, tx) => sum + tx.amount, 0);
     setTotalBalance(totalIncomeAllTime - totalExpensesAllTime);
 
     const currentDate = new Date();
@@ -164,7 +180,7 @@ export default function DashboardPage() {
       const txDate = parseISO(tx.date);
       return txDate.getFullYear() === currentYear && txDate.getMonth() === currentMonth;
     });
-    const currentMonthExpensesTxns = expenses.filter(tx => {
+    const currentMonthExpensesTxns = finalExpenses.filter(tx => {
       const txDate = parseISO(tx.date);
       return txDate.getFullYear() === currentYear && txDate.getMonth() === currentMonth;
     });
@@ -198,7 +214,7 @@ export default function DashboardPage() {
         })
         .reduce((sum, tx) => sum + tx.amount, 0);
 
-      const monthExpenses = expenses
+      const monthExpenses = finalExpenses
         .filter(tx => {
           const txDate = parseISO(tx.date);
           return txDate.getFullYear() === year && txDate.getMonth() === month;
@@ -217,7 +233,7 @@ export default function DashboardPage() {
     const sevenDaysFromNow = new Date(today);
     sevenDaysFromNow.setDate(today.getDate() + 7);
 
-    const upcoming = processedSubscriptions
+    const upcoming = updatedSubscriptions
       .filter(sub => {
         const dueDate = parseISO(sub.nextDueDate);
         return sub.status === "Activa" && dueDate >= today && dueDate <= sevenDaysFromNow;
@@ -226,7 +242,7 @@ export default function DashboardPage() {
       .slice(0, MAX_UPCOMING_SUBSCRIPTIONS);
     setUpcomingSubscriptions(upcoming);
 
-  }, [currentUserEmail]);
+  }, [currentUserEmail, router]); // Added router to dependency array as it's used inside
 
   React.useEffect(() => {
     if (currentUserEmail) {
@@ -266,10 +282,10 @@ export default function DashboardPage() {
 
 
   const getBudgetIndicatorColor = (utilization: number): string => {
-    if (utilization === 100) {
+    if (utilization >= 100) { // Changed to >= 100 for red
       return "bg-destructive"; // Red
     }
-    if (utilization >= 60 && utilization <= 90) {
+    if (utilization >= 60 && utilization < 90) { // Changed to < 90 for yellow
       return "bg-[hsl(var(--chart-4))]"; // Yellow (using chart-4 for yellow-ish color)
     }
     return "bg-primary"; // Default blue (primary color)
