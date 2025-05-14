@@ -62,13 +62,6 @@ interface Category {
 const APP_EXPENSES_STORAGE_KEY = "remindme_expenses";
 const APP_CATEGORIES_STORAGE_KEY = "remindme_categories";
 
-const initialExpenses: Expense[] = [
-  { id: "1", date: "2024-07-20", category: "Food & Dining", description: "Groceries from SuperMart", amount: 75.50 },
-  { id: "2", date: "2024-07-19", category: "Transportation", description: "Monthly metro pass", amount: 55.00 },
-  { id: "3", date: "2024-07-18", category: "Shopping", description: "Movie tickets - Space Odyssey", amount: 25.00 },
-  { id: "4", date: "2024-07-17", category: "Housing", description: "Electricity bill", amount: 120.75 },
-];
-
 const availableIcons: { name: string; component: LucideIcon }[] = [
     { name: "Utensils", component: Utensils },
     { name: "Car", component: Car },
@@ -105,7 +98,7 @@ export default function ExpensesPage() {
         }
       }
     }
-    return initialExpenses;
+    return []; // Initialize with an empty array
   });
   const [pageCategories, setPageCategories] = React.useState<Category[]>(() => defaultPageCategoriesData.map(mapStoredToCategory));
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
@@ -291,9 +284,10 @@ export default function ExpensesPage() {
                 name="category" 
                 defaultValue={editingExpense?.category || (pageCategories.length > 0 ? pageCategories[0].name : "")} 
                 required
+                disabled={pageCategories.length === 0}
                 className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {pageCategories.length === 0 && <option disabled value="">No categories available</option>}
+                {pageCategories.length === 0 && <option disabled value="">No categories available. Please add a category first.</option>}
                 {pageCategories.map(cat => (
                   <option key={cat.id} value={cat.name}>{cat.name}</option>
                 ))}
@@ -305,7 +299,7 @@ export default function ExpensesPage() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-              <Button type="submit">Save Expense</Button>
+              <Button type="submit" disabled={pageCategories.length === 0}>Save Expense</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -313,3 +307,4 @@ export default function ExpensesPage() {
     </AppLayout>
   );
 }
+
