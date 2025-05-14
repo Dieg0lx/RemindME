@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { DollarSign, TrendingUp, TrendingDown, Wallet, CalendarClock } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip as ChartTooltipRecharts, Legend } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
-import { format } from 'date-fns';
+import { format, addMonths, addQuarters, addYears, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale'; 
 import { APP_LOGGED_IN_USER_KEY, getUserSpecificKey } from "@/lib/storageKeys";
 import { useRouter } from "next/navigation";
@@ -104,7 +104,7 @@ export default function DashboardPage() {
 
     let expenses: Expense[] = [];
     let incomeTransactions: IncomeTransaction[] = [];
-    let subscriptions: Subscription[] = [];
+    let rawSubscriptions: Subscription[] = [];
 
     try {
       if (storedExpensesRaw) expenses = JSON.parse(storedExpensesRaw);
@@ -113,9 +113,46 @@ export default function DashboardPage() {
       if (storedIncomeRaw) incomeTransactions = JSON.parse(storedIncomeRaw);
     } catch (e) { console.error("Failed to parse income from localStorage", e); }
     try {
-      if (storedSubscriptionsRaw) subscriptions = JSON.parse(storedSubscriptionsRaw);
+      if (storedSubscriptionsRaw) rawSubscriptions = JSON.parse(storedSubscriptionsRaw);
     } catch (e) { console.error("Failed to parse subscriptions from localStorage", e); }
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const processedSubscriptions = rawSubscriptions.map(sub => {
+      if (sub.status === "Activa") {
+        // Ensure dueDate is parsed as local by appending time if it's just YYYY-MM-DD
+        let dueDate = parseISO(sub.nextDueDate); // date-fns parseISO handles YYYY-MM-DD correctly
+        if (dueDate < today) {
+          // Due date is in the past, calculate the next one
+          let newNextDueDate = parseISO(sub.nextDueDate);
+          do {
+            switch (sub.cycle) {
+              case "Mensual":
+                newNextDueDate = addMonths(newNextDueDate, 1);
+                break;
+              case "Trimestral":
+                newNextDueDate = addQuarters(newNextDueDate, 1); // More accurate for quarters
+                break;
+              case "Anual":
+                newNextDueDate = addYears(newNextDueDate, 1);
+                break;
+            }
+          } while (newNextDueDate < today);
+          
+          return {
+            ...sub,
+            nextDueDate: format(newNextDueDate, 'yyyy-MM-dd')
+          };
+        }
+      }
+      return sub; 
+    });
+
+    // Save processed subscriptions back to localStorage
+    localStorage.setItem(userSubscriptionsKey, JSON.stringify(processedSubscriptions));
+    // No need to dispatch 'localStorageUpdated' here as this function itself is often triggered by it
+    // or on initial load. This prevents potential loops if not handled carefully.
 
     const totalIncomeAllTime = incomeTransactions.reduce((sum, tx) => sum + tx.amount, 0);
     const totalExpensesAllTime = expenses.reduce((sum, tx) => sum + tx.amount, 0);
@@ -126,11 +163,11 @@ export default function DashboardPage() {
     const currentYear = currentDate.getFullYear();
 
     const currentMonthIncomeTxns = incomeTransactions.filter(tx => {
-      const txDate = new Date(tx.date);
+      const txDate = parseISO(tx.date);
       return txDate.getFullYear() === currentYear && txDate.getMonth() === currentMonth;
     });
     const currentMonthExpensesTxns = expenses.filter(tx => {
-      const txDate = new Date(tx.date);
+      const txDate = parseISO(tx.date);
       return txDate.getFullYear() === currentYear && txDate.getMonth() === currentMonth;
     });
 
@@ -158,14 +195,14 @@ export default function DashboardPage() {
 
       const monthIncome = incomeTransactions
         .filter(tx => {
-          const txDate = new Date(tx.date);
+          const txDate = parseISO(tx.date);
           return txDate.getFullYear() === year && txDate.getMonth() === month;
         })
         .reduce((sum, tx) => sum + tx.amount, 0);
 
       const monthExpenses = expenses
         .filter(tx => {
-          const txDate = new Date(tx.date);
+          const txDate = parseISO(tx.date);
           return txDate.getFullYear() === year && txDate.getMonth() === month;
         })
         .reduce((sum, tx) => sum + tx.amount, 0);
@@ -179,17 +216,16 @@ export default function DashboardPage() {
     }
     setMonthlyChartData(chartDataArray);
 
-    // Process upcoming subscriptions
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Process upcoming subscriptions based on the 7-day window
+    const sevenDaysFromNow = new Date(today);
+    sevenDaysFromNow.setDate(today.getDate() + 7);
 
-    const upcoming = subscriptions
+    const upcoming = processedSubscriptions
       .filter(sub => {
-        const [year, month, day] = sub.nextDueDate.split('-').map(Number);
-        const normalizedDueDate = new Date(year, month - 1, day);
-        return sub.status === "Activa" && normalizedDueDate >= today;
+        const dueDate = parseISO(sub.nextDueDate);
+        return sub.status === "Activa" && dueDate >= today && dueDate <= sevenDaysFromNow;
       })
-      .sort((a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime())
+      .sort((a, b) => parseISO(a.nextDueDate).getTime() - parseISO(b.nextDueDate).getTime())
       .slice(0, MAX_UPCOMING_SUBSCRIPTIONS);
     setUpcomingSubscriptions(upcoming);
 
@@ -312,20 +348,20 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <CalendarClock className="mr-2 h-5 w-5 text-muted-foreground" />
-              Próximas Suscripciones
+              Próximas Suscripciones (7 días)
             </CardTitle>
-            <CardDescription>Pagos recurrentes que se acercan.</CardDescription>
+            <CardDescription>Pagos recurrentes que se acercan en la próxima semana.</CardDescription>
           </CardHeader>
           <CardContent>
             {upcomingSubscriptions.length > 0 ? (
-              <ScrollArea className="h-[280px]"> {/* Adjusted height to better match chart card content area */}
+              <ScrollArea className="h-[280px]">
                 <ul className="space-y-3 pr-3">
                   {upcomingSubscriptions.map(sub => (
                     <li key={sub.id} className="flex justify-between items-center p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
                       <div>
                         <p className="font-medium text-sm">{sub.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          Vence: {format(new Date(sub.nextDueDate + 'T00:00:00'), 'dd/MM/yyyy', { locale: es })} {/* Ensure date is treated as local */}
+                          Vence: {format(parseISO(sub.nextDueDate), 'dd/MM/yyyy', { locale: es })}
                         </p>
                       </div>
                       <div className="text-right">
@@ -337,7 +373,7 @@ export default function DashboardPage() {
                 </ul>
               </ScrollArea>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-10">No tienes suscripciones activas próximas a vencer.</p>
+              <p className="text-sm text-muted-foreground text-center py-10">No tienes suscripciones activas próximas a vencer en los siguientes 7 días.</p>
             )}
           </CardContent>
         </Card>
