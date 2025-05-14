@@ -13,13 +13,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Settings, UserCircle } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 export function UserNav() {
+  const router = useRouter();
   // In a real app, user data would come from context or a hook
   const user = {
     name: "User Name",
     email: "user@remindme.app",
-    avatar: "https://picsum.photos/100/100", 
+    avatar: "https://picsum.photos/100/100",
   };
 
   const getInitials = (name: string) => {
@@ -28,6 +30,11 @@ export function UserNav() {
       .map((n) => n[0])
       .join("")
       .toUpperCase();
+  };
+
+  const handleLogout = () => {
+    // In a real app, you would clear auth tokens, session, etc.
+    router.push("/login");
   };
 
   return (
@@ -63,7 +70,7 @@ export function UserNav() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>
