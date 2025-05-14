@@ -12,23 +12,33 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
 const APP_USERS_STORAGE_KEY = "remindme_users";
-const APP_LOGGED_IN_USER_KEY = "remindme_logged_in_user";
 
 interface User {
   email: string;
   password_REPLACEME: string; // In a real app, this would be a hashed password
 }
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [confirmPassword, setConfirmPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
 
-  const handleLogin = (event: React.FormEvent) => {
+  const handleSignup = (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+
+    if (password !== confirmPassword) {
+      setError("Las contraseñas no coinciden.");
+      toast({
+        title: "Error de Registro",
+        description: "Las contraseñas no coinciden.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (typeof window === 'undefined') return;
 
@@ -44,23 +54,27 @@ export default function LoginPage() {
       }
     }
 
-    const user = users.find(u => u.email === email);
-
-    if (user && user.password_REPLACEME === password) {
-      localStorage.setItem(APP_LOGGED_IN_USER_KEY, JSON.stringify({ email: user.email, name: user.email.split('@')[0] })); // Store minimal user info
+    if (users.find(u => u.email === email)) {
+      setError("Este correo electrónico ya está registrado.");
       toast({
-        title: "Inicio de Sesión Exitoso",
-        description: "¡Bienvenido de nuevo!",
-      });
-      router.push("/dashboard");
-    } else {
-      setError("Correo electrónico o contraseña incorrectos.");
-      toast({
-        title: "Error de Inicio de Sesión",
-        description: "Correo electrónico o contraseña incorrectos.",
+        title: "Error de Registro",
+        description: "Este correo electrónico ya está registrado.",
         variant: "destructive",
       });
+      return;
     }
+
+    // IMPORTANT: In a real application, hash the password before storing it.
+    // Storing plain text passwords is a major security risk.
+    const newUser: User = { email, password_REPLACEME: password };
+    users.push(newUser);
+    localStorage.setItem(APP_USERS_STORAGE_KEY, JSON.stringify(users));
+
+    toast({
+      title: "¡Registro Exitoso!",
+      description: "Tu cuenta ha sido creada. Ahora puedes iniciar sesión.",
+    });
+    router.push("/login");
   };
 
   return (
@@ -68,11 +82,11 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm shadow-xl">
         <CardHeader className="items-center text-center">
           <Logo className="mb-4 h-12 w-auto" />
-          <CardTitle className="text-2xl">¡Bienvenido de Nuevo!</CardTitle>
-          <CardDescription>Ingresa tus credenciales para acceder a tu presupuesto.</CardDescription>
+          <CardTitle className="text-2xl">Crear Cuenta</CardTitle>
+          <CardDescription>Ingresa tus datos para registrarte.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleSignup} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="email">Correo Electrónico</Label>
               <Input 
@@ -85,29 +99,36 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center">
-                <Label htmlFor="password">Contraseña</Label>
-                <Link href="#" className="ml-auto inline-block text-sm underline">
-                  ¿Olvidaste tu contraseña?
-                </Link>
-              </div>
+              <Label htmlFor="password">Contraseña</Label>
               <Input 
                 id="password" 
                 type="password" 
                 required 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                minLength={6}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirmar Contraseña</Label>
+              <Input 
+                id="confirm-password" 
+                type="password" 
+                required 
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                minLength={6}
               />
             </div>
             {error && <p className="text-sm text-destructive text-center">{error}</p>}
             <Button type="submit" className="w-full shadow-md">
-              Iniciar Sesión
+              Registrarse
             </Button>
           </form>
           <div className="mt-6 text-center text-sm">
-            ¿No tienes una cuenta?{" "}
-            <Link href="/signup" className="underline">
-              Regístrate
+            ¿Ya tienes una cuenta?{" "}
+            <Link href="/login" className="underline">
+              Iniciar Sesión
             </Link>
           </div>
         </CardContent>
