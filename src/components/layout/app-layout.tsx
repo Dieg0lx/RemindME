@@ -59,7 +59,6 @@ export function AppLayout({ children }: AppLayoutProps) {
                     asChild
                     isActive={isActive}
                     tooltip={{ children: item.label, side: "right", align: "center" }}
-                    className={cn(isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground")}
                   >
                     <Link href={item.href}>
                       <item.icon />

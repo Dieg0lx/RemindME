@@ -10,7 +10,7 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
       aria-label="BudgetView Logo"
       {...props}
     >
-      <rect width="200" height="50" rx="5" fill="hsl(var(--primary))" />
+      <rect width="100%" height="100%" rx="5" fill="hsl(var(--logo-background-sidebar))" />
       <text
         x="50%"
         y="50%"
@@ -19,7 +19,7 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
         fontFamily="var(--font-geist-sans, Arial), sans-serif"
         fontSize="28"
         fontWeight="bold"
-        fill="hsl(var(--primary-foreground))"
+        fill="hsl(var(--logo-foreground-sidebar))"
       >
         BudgetView
       </text>
