@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -46,26 +47,51 @@ interface Subscription {
   id: string;
   name: string;
   amount: number;
-  cycle: "Monthly" | "Yearly" | "Quarterly";
+  cycle: "Mensual" | "Anual" | "Trimestral";
   nextDueDate: string;
-  status: "Active" | "Paused" | "Cancelled";
+  status: "Activa" | "Pausada" | "Cancelada";
 }
 
+const APP_SUBSCRIPTIONS_STORAGE_KEY = "remindme_subscriptions";
+
+
 const initialSubscriptions: Subscription[] = [
-  { id: "1", name: "Netflix Premium", amount: 19.99, cycle: "Monthly", nextDueDate: "2024-08-15", status: "Active" },
-  { id: "2", name: "Spotify Family", amount: 16.99, cycle: "Monthly", nextDueDate: "2024-08-20", status: "Active" },
-  { id: "3", name: "Adobe Creative Cloud", amount: 599.88, cycle: "Yearly", nextDueDate: "2025-01-10", status: "Active" },
-  { id: "4", name: "Gym Membership", amount: 45.00, cycle: "Monthly", nextDueDate: "2024-08-01", status: "Paused" },
-  { id: "5", name: "Old Service", amount: 10.00, cycle: "Monthly", nextDueDate: "2024-07-01", status: "Cancelled" },
+  { id: "1", name: "Netflix Premium", amount: 19.99, cycle: "Mensual", nextDueDate: "2024-08-15", status: "Activa" },
+  { id: "2", name: "Spotify Family", amount: 16.99, cycle: "Mensual", nextDueDate: "2024-08-20", status: "Activa" },
+  { id: "3", name: "Adobe Creative Cloud", amount: 599.88, cycle: "Anual", nextDueDate: "2025-01-10", status: "Activa" },
+  { id: "4", name: "Membresía de Gimnasio", amount: 45.00, cycle: "Mensual", nextDueDate: "2024-08-01", status: "Pausada" },
+  { id: "5", name: "Servicio Antiguo", amount: 10.00, cycle: "Mensual", nextDueDate: "2024-07-01", status: "Cancelada" },
 ];
 
-const subscriptionCycles: Subscription["cycle"][] = ["Monthly", "Yearly", "Quarterly"];
-const subscriptionStatuses: Subscription["status"][] = ["Active", "Paused", "Cancelled"];
+const subscriptionCycles: Subscription["cycle"][] = ["Mensual", "Anual", "Trimestral"];
+const subscriptionStatuses: Subscription["status"][] = ["Activa", "Pausada", "Cancelada"];
 
 export default function SubscriptionsPage() {
-  const [subscriptions, setSubscriptions] = React.useState<Subscription[]>(initialSubscriptions);
+  const [subscriptions, setSubscriptions] = React.useState<Subscription[]>(() => {
+    if (typeof window !== 'undefined') {
+      const storedSubscriptions = localStorage.getItem(APP_SUBSCRIPTIONS_STORAGE_KEY);
+      if (storedSubscriptions) {
+        try {
+          return JSON.parse(storedSubscriptions);
+        } catch (e) {
+          console.error("Failed to parse subscriptions from localStorage", e);
+        }
+      }
+      return initialSubscriptions; // Initialize with default if nothing in storage
+    }
+    return initialSubscriptions; // Default for SSR or if window is undefined
+  });
+
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingSubscription, setEditingSubscription] = React.useState<Subscription | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(APP_SUBSCRIPTIONS_STORAGE_KEY, JSON.stringify(subscriptions));
+       window.dispatchEvent(new CustomEvent('localStorageUpdated', { detail: { key: APP_SUBSCRIPTIONS_STORAGE_KEY } }));
+    }
+  }, [subscriptions]);
+
 
   const handleOpenDialog = (subscription?: Subscription) => {
     setEditingSubscription(subscription || null);
@@ -87,7 +113,7 @@ export default function SubscriptionsPage() {
     if (editingSubscription) {
       setSubscriptions(subs => subs.map(s => (s.id === editingSubscription.id ? newSubscription : s)));
     } else {
-      setSubscriptions(subs => [...subs, newSubscription]);
+      setSubscriptions(subs => [...subs, newSubscription].sort((a,b) => new Date(b.nextDueDate).getTime() - new Date(a.nextDueDate).getTime()));
     }
     setIsDialogOpen(false);
     setEditingSubscription(null);
@@ -106,8 +132,8 @@ export default function SubscriptionsPage() {
   return (
     <AppLayout>
       <PageHeader
-        title="Subscriptions"
-        actionButtonText="Add Subscription"
+        title="Suscripciones"
+        actionButtonText="Agregar Suscripción"
         ActionIcon={PlusCircle}
         onActionButtonClick={() => handleOpenDialog()}
       />
@@ -115,9 +141,9 @@ export default function SubscriptionsPage() {
       {subscriptions.length === 0 ? (
         <EmptyState
           IconCmp={CreditCard}
-          title="No Subscriptions Yet"
-          description="Add your recurring subscriptions to keep track of them."
-          actionButtonText="Add First Subscription"
+          title="Aún No Hay Suscripciones"
+          description="Agrega tus suscripciones recurrentes para llevar un seguimiento."
+          actionButtonText="Agregar Primera Suscripción"
           onActionButtonClick={() => handleOpenDialog()}
         />
       ) : (
@@ -125,12 +151,12 @@ export default function SubscriptionsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Billing Cycle</TableHead>
-                <TableHead>Next Due Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead className="text-right">Monto</TableHead>
+                <TableHead>Ciclo de Facturación</TableHead>
+                <TableHead>Próximo Vencimiento</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -141,7 +167,10 @@ export default function SubscriptionsPage() {
                   <TableCell>{sub.cycle}</TableCell>
                   <TableCell>{sub.nextDueDate}</TableCell>
                   <TableCell>
-                    <Badge variant={sub.status === "Active" ? "default" : sub.status === "Paused" ? "secondary" : "destructive"} className="capitalize">
+                    <Badge 
+                      variant={sub.status === "Activa" ? "default" : sub.status === "Pausada" ? "secondary" : "destructive"} 
+                      className="capitalize"
+                    >
                       {sub.status.toLowerCase()}
                     </Badge>
                   </TableCell>
@@ -149,33 +178,33 @@ export default function SubscriptionsPage() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
+                          <span className="sr-only">Abrir menú</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleOpenDialog(sub)}>
-                          <Edit className="mr-2 h-4 w-4" /> Edit
+                          <Edit className="mr-2 h-4 w-4" /> Editar
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        {sub.status !== "Active" && (
-                          <DropdownMenuItem onClick={() => handleChangeStatus(sub.id, "Active")}>
-                            <CheckCircle className="mr-2 h-4 w-4" /> Mark as Active
+                        {sub.status !== "Activa" && (
+                          <DropdownMenuItem onClick={() => handleChangeStatus(sub.id, "Activa")}>
+                            <CheckCircle className="mr-2 h-4 w-4" /> Marcar como Activa
                           </DropdownMenuItem>
                         )}
-                        {sub.status !== "Paused" && (
-                          <DropdownMenuItem onClick={() => handleChangeStatus(sub.id, "Paused")}>
-                            <PauseCircle className="mr-2 h-4 w-4" /> Mark as Paused
+                        {sub.status !== "Pausada" && (
+                          <DropdownMenuItem onClick={() => handleChangeStatus(sub.id, "Pausada")}>
+                            <PauseCircle className="mr-2 h-4 w-4" /> Marcar como Pausada
                           </DropdownMenuItem>
                         )}
-                        {sub.status !== "Cancelled" && (
-                          <DropdownMenuItem onClick={() => handleChangeStatus(sub.id, "Cancelled")}>
-                            <XCircle className="mr-2 h-4 w-4" /> Mark as Cancelled
+                        {sub.status !== "Cancelada" && (
+                          <DropdownMenuItem onClick={() => handleChangeStatus(sub.id, "Cancelada")}>
+                            <XCircle className="mr-2 h-4 w-4" /> Marcar como Cancelada
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => handleDeleteSubscription(sub.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -190,22 +219,22 @@ export default function SubscriptionsPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingSubscription ? "Edit" : "Add"} Subscription</DialogTitle>
+            <DialogTitle>{editingSubscription ? "Editar" : "Agregar"} Suscripción</DialogTitle>
             <DialogDescription>
-              {editingSubscription ? "Update the details of your subscription." : "Enter the details for the new subscription."}
+              {editingSubscription ? "Actualiza los detalles de tu suscripción." : "Ingresa los detalles para la nueva suscripción."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveSubscription} className="space-y-4">
             <div>
-              <Label htmlFor="name" className="mb-1 block">Name</Label>
+              <Label htmlFor="name" className="mb-1 block">Nombre</Label>
               <Input id="name" name="name" defaultValue={editingSubscription?.name} required />
             </div>
             <div>
-              <Label htmlFor="amount" className="mb-1 block">Amount ($)</Label>
+              <Label htmlFor="amount" className="mb-1 block">Monto ($)</Label>
               <Input id="amount" name="amount" type="number" step="0.01" defaultValue={editingSubscription?.amount} required />
             </div>
             <div>
-              <Label htmlFor="cycle" className="mb-1 block">Billing Cycle</Label>
+              <Label htmlFor="cycle" className="mb-1 block">Ciclo de Facturación</Label>
               <select 
                 id="cycle" 
                 name="cycle" 
@@ -219,11 +248,11 @@ export default function SubscriptionsPage() {
               </select>
             </div>
             <div>
-              <Label htmlFor="nextDueDate" className="mb-1 block">Next Due Date</Label>
-              <Input id="nextDueDate" name="nextDueDate" type="date" defaultValue={editingSubscription?.nextDueDate} required />
+              <Label htmlFor="nextDueDate" className="mb-1 block">Próxima Fecha de Vencimiento</Label>
+              <Input id="nextDueDate" name="nextDueDate" type="date" defaultValue={editingSubscription?.nextDueDate || new Date().toISOString().split('T')[0]} required />
             </div>
             <div>
-              <Label htmlFor="status" className="mb-1 block">Status</Label>
+              <Label htmlFor="status" className="mb-1 block">Estado</Label>
               <select 
                 id="status" 
                 name="status" 
@@ -237,8 +266,8 @@ export default function SubscriptionsPage() {
               </select>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-              <Button type="submit">Save Subscription</Button>
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+              <Button type="submit">Guardar Suscripción</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -246,3 +275,4 @@ export default function SubscriptionsPage() {
     </AppLayout>
   );
 }
+
