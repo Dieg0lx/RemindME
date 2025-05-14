@@ -121,10 +121,8 @@ export default function DashboardPage() {
 
     const processedSubscriptions = rawSubscriptions.map(sub => {
       if (sub.status === "Activa") {
-        // Ensure dueDate is parsed as local by appending time if it's just YYYY-MM-DD
-        let dueDate = parseISO(sub.nextDueDate); // date-fns parseISO handles YYYY-MM-DD correctly
+        let dueDate = parseISO(sub.nextDueDate); 
         if (dueDate < today) {
-          // Due date is in the past, calculate the next one
           let newNextDueDate = parseISO(sub.nextDueDate);
           do {
             switch (sub.cycle) {
@@ -132,7 +130,7 @@ export default function DashboardPage() {
                 newNextDueDate = addMonths(newNextDueDate, 1);
                 break;
               case "Trimestral":
-                newNextDueDate = addQuarters(newNextDueDate, 1); // More accurate for quarters
+                newNextDueDate = addQuarters(newNextDueDate, 1); 
                 break;
               case "Anual":
                 newNextDueDate = addYears(newNextDueDate, 1);
@@ -148,11 +146,11 @@ export default function DashboardPage() {
       }
       return sub; 
     });
-
-    // Save processed subscriptions back to localStorage
-    localStorage.setItem(userSubscriptionsKey, JSON.stringify(processedSubscriptions));
-    // No need to dispatch 'localStorageUpdated' here as this function itself is often triggered by it
-    // or on initial load. This prevents potential loops if not handled carefully.
+    
+    if (currentUserEmail) { // Ensure currentUserEmail is not null before setting item
+        localStorage.setItem(userSubscriptionsKey, JSON.stringify(processedSubscriptions));
+    }
+    
 
     const totalIncomeAllTime = incomeTransactions.reduce((sum, tx) => sum + tx.amount, 0);
     const totalExpensesAllTime = expenses.reduce((sum, tx) => sum + tx.amount, 0);
@@ -216,7 +214,6 @@ export default function DashboardPage() {
     }
     setMonthlyChartData(chartDataArray);
 
-    // Process upcoming subscriptions based on the 7-day window
     const sevenDaysFromNow = new Date(today);
     sevenDaysFromNow.setDate(today.getDate() + 7);
 
@@ -266,6 +263,19 @@ export default function DashboardPage() {
       window.removeEventListener('localStorageUpdated', handleLocalStorageUpdated as EventListener);
     };
   }, [fetchDataAndUpdateDashboard, currentUserEmail]);
+
+
+  const getBudgetIndicatorColor = (utilization: number): string => {
+    if (utilization === 100) {
+      return "bg-destructive"; // Red
+    }
+    if (utilization >= 60 && utilization <= 90) {
+      return "bg-[hsl(var(--chart-4))]"; // Yellow (using chart-4 for yellow-ish color)
+    }
+    return "bg-primary"; // Default blue (primary color)
+  };
+  
+  const budgetIndicatorClassName = getBudgetIndicatorColor(budgetUtilization);
 
   if (!currentUserEmail) {
     return (
@@ -317,7 +327,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{budgetUtilization}% Utilizado</div>
-            <Progress value={budgetUtilization} className="mt-2 h-2" />
+            <Progress value={budgetUtilization} className="mt-2 h-2" indicatorClassName={budgetIndicatorClassName} />
           </CardContent>
         </Card>
       </div>
