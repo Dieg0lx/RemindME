@@ -10,6 +10,7 @@ import { DollarSign, TrendingUp, TrendingDown, Wallet } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip as ChartTooltipRecharts, Legend } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale'; // Import Spanish locale
 
 const APP_EXPENSES_STORAGE_KEY = "remindme_expenses";
 const APP_INCOME_STORAGE_KEY = "remindme_income_transactions";
@@ -30,7 +31,7 @@ interface IncomeTransaction {
 }
 
 interface MonthlySummary {
-  month: string; // e.g., "July"
+  month: string; // e.g., "Julio"
   year: number;
   expenses: number;
   income: number;
@@ -38,11 +39,11 @@ interface MonthlySummary {
 
 const chartConfig = {
   income: {
-    label: "Income",
+    label: "Ingresos",
     color: "hsl(var(--chart-2))",
   },
   expenses: {
-    label: "Expenses",
+    label: "Gastos",
     color: "hsl(var(--chart-1))",
   },
 } satisfies ChartConfig;
@@ -133,7 +134,7 @@ export default function DashboardPage() {
         .reduce((sum, tx) => sum + tx.amount, 0);
         
       chartDataArray.push({
-        month: format(dateIterator, 'MMMM'),
+        month: format(dateIterator, 'MMMM', { locale: es }), // Use Spanish locale for month names
         year: year,
         income: monthIncome,
         expenses: monthExpenses,
@@ -169,45 +170,45 @@ export default function DashboardPage() {
 
   return (
     <AppLayout>
-      <PageHeader title="Dashboard" />
+      <PageHeader title="Panel de Control" />
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card className="shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Balance</CardTitle>
+            <CardTitle className="text-sm font-medium">Balance Total</CardTitle>
             <Wallet className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${totalBalance.toFixed(2)}</div>
-            {/* <p className="text-xs text-muted-foreground">+5.2% from last month</p> */}
+            {/* <p className="text-xs text-muted-foreground">+5.2% del mes pasado</p> */}
           </CardContent>
         </Card>
         <Card className="shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Income</CardTitle>
+            <CardTitle className="text-sm font-medium">Ingresos Mensuales</CardTitle>
             <TrendingUp className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${monthlyIncome.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Current month</p>
+            <p className="text-xs text-muted-foreground">Mes actual</p>
           </CardContent>
         </Card>
         <Card className="shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Expenses</CardTitle>
+            <CardTitle className="text-sm font-medium">Gastos Mensuales</CardTitle>
             <TrendingDown className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${monthlyExpenses.toFixed(2)}</div>
-            {/* <p className="text-xs text-muted-foreground">-2.1% from last month</p> */}
+            {/* <p className="text-xs text-muted-foreground">-2.1% del mes pasado</p> */}
           </CardContent>
         </Card>
         <Card className="shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Budget Utilization</CardTitle>
+            <CardTitle className="text-sm font-medium">Utilización del Presupuesto</CardTitle>
             <DollarSign className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{budgetUtilization}% Utilized</div>
+            <div className="text-2xl font-bold">{budgetUtilization}% Utilizado</div>
             <Progress value={budgetUtilization} className="mt-2 h-2" />
           </CardContent>
         </Card>
@@ -215,8 +216,8 @@ export default function DashboardPage() {
       <div className="mt-6 grid gap-6 md:grid-cols-1">
         <Card className="shadow-md">
           <CardHeader>
-            <CardTitle>Income vs Expenses Overview</CardTitle>
-            <CardDescription>Last 6 months performance</CardDescription>
+            <CardTitle>Resumen de Ingresos vs Gastos</CardTitle>
+            <CardDescription>Rendimiento de los últimos 6 meses</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -225,9 +226,9 @@ export default function DashboardPage() {
                   <XAxis dataKey="month" tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <YAxis tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `$${value}`} />
                    <ChartTooltipRecharts cursor={false} content={<ChartTooltipContent indicator="dot" />} />
-                  <Legend />
-                  <Bar dataKey="income" fill="var(--color-income)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" fill="var(--color-expenses)" radius={[4, 4, 0, 0]} />
+                  <Legend formatter={(value) => chartConfig[value as keyof typeof chartConfig]?.label || value} />
+                  <Bar dataKey="income" fill="var(--color-income)" radius={[4, 4, 0, 0]} name="Ingresos" />
+                  <Bar dataKey="expenses" fill="var(--color-expenses)" radius={[4, 4, 0, 0]} name="Gastos" />
                 </BarChart>
               </ResponsiveContainer>
             </ChartContainer>
@@ -237,3 +238,4 @@ export default function DashboardPage() {
     </AppLayout>
   );
 }
+
