@@ -55,7 +55,7 @@ export default function IncomePage() {
         }
       }
     }
-    return []; // Start with no initial income transactions or provide some defaults
+    return []; 
   });
 
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
@@ -100,8 +100,8 @@ export default function IncomePage() {
   return (
     <AppLayout>
       <PageHeader
-        title="Income"
-        actionButtonText="Add Income"
+        title="Ingresos"
+        actionButtonText="Agregar Ingreso"
         ActionIcon={PlusCircle}
         onActionButtonClick={() => handleOpenDialog()}
       />
@@ -109,9 +109,9 @@ export default function IncomePage() {
       {incomeTransactions.length === 0 ? (
         <EmptyState
           IconCmp={Banknote}
-          title="No Income Recorded"
-          description="Start tracking your income to get a better view of your finances."
-          actionButtonText="Add First Income"
+          title="No Hay Ingresos Registrados"
+          description="Comienza a registrar tus ingresos para tener una mejor visión de tus finanzas."
+          actionButtonText="Agregar Primer Ingreso"
           onActionButtonClick={() => handleOpenDialog()}
         />
       ) : (
@@ -119,11 +119,11 @@ export default function IncomePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead>Fuente</TableHead>
+                <TableHead className="text-right">Monto</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -137,16 +137,16 @@ export default function IncomePage() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
+                          <span className="sr-only">Abrir menú</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleOpenDialog(txn)}>
-                          <Edit className="mr-2 h-4 w-4" /> Edit
+                          <Edit className="mr-2 h-4 w-4" /> Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDeleteTransaction(txn.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -161,31 +161,31 @@ export default function IncomePage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingTransaction ? "Edit" : "Add"} Income</DialogTitle>
+            <DialogTitle>{editingTransaction ? "Editar" : "Agregar"} Ingreso</DialogTitle>
             <DialogDescription>
-              {editingTransaction ? "Update the details of your income." : "Enter the details for the new income."}
+              {editingTransaction ? "Actualiza los detalles de tu ingreso." : "Ingresa los detalles para el nuevo ingreso."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveTransaction} className="space-y-4">
             <div>
-              <Label htmlFor="date" className="mb-1 block">Date</Label>
+              <Label htmlFor="date" className="mb-1 block">Fecha</Label>
               <Input id="date" name="date" type="date" defaultValue={editingTransaction?.date || new Date().toISOString().split('T')[0]} required />
             </div>
             <div>
-              <Label htmlFor="amount" className="mb-1 block">Amount ($)</Label>
+              <Label htmlFor="amount" className="mb-1 block">Monto ($)</Label>
               <Input id="amount" name="amount" type="number" step="0.01" defaultValue={editingTransaction?.amount} placeholder="0.00" required />
             </div>
             <div>
-              <Label htmlFor="description" className="mb-1 block">Description</Label>
-              <Textarea id="description" name="description" defaultValue={editingTransaction?.description} placeholder="e.g., Monthly Salary" required/>
+              <Label htmlFor="description" className="mb-1 block">Descripción</Label>
+              <Textarea id="description" name="description" defaultValue={editingTransaction?.description} placeholder="Ej: Salario mensual" required/>
             </div>
             <div>
-              <Label htmlFor="source" className="mb-1 block">Source (Optional)</Label>
-              <Input id="source" name="source" defaultValue={editingTransaction?.source} placeholder="e.g., Company X, Freelance Project Y" />
+              <Label htmlFor="source" className="mb-1 block">Fuente (Opcional)</Label>
+              <Input id="source" name="source" defaultValue={editingTransaction?.source} placeholder="Ej: Empresa X, Proyecto Freelance Y" />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-              <Button type="submit">Save Income</Button>
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+              <Button type="submit">Guardar Ingreso</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -193,3 +193,4 @@ export default function IncomePage() {
     </AppLayout>
   );
 }
+
